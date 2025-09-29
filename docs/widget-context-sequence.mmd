@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant UI as Фронтенд (UI)
+    participant Widgets as Виджеты
+    participant MiddleBack as Миддл-бек
+    participant Graph as Граф продукта
+    participant Screens as Каталог экранов
+    participant Context as Виртуальный контекст
+
+    Note over UI,MiddleBack: Первый запуск приложения
+    UI->>MiddleBack: Запросить стартовый экран
+    MiddleBack->>Graph: Найти стартовый узел
+    Graph-->>MiddleBack: screenId (первый экран)
+    MiddleBack->>Screens: Загрузить описание экрана
+    Screens-->>MiddleBack: Layout + свойства виджетов
+    MiddleBack->>Context: Получить значения переменных
+    Context-->>MiddleBack: Текущий снапшот
+    MiddleBack-->>UI: Экран #1 + contextSnapshot
+
+    UI->>Widgets: Построить дерево и применить snapshot
+    Widgets-->>UI: Готовый интерфейс
+
+    loop Пока пользователь взаимодействует
+        Widgets->>UI: Событие (action, ввод данных)
+        UI->>MiddleBack: event + outputs
+        MiddleBack->>Context: Обновить переменные
+        Context-->>MiddleBack: Подтверждение
+        MiddleBack->>Graph: Определить следующий экран
+        Graph-->>MiddleBack: nextScreenId
+        MiddleBack->>Screens: Загрузить описание nextScreenId
+        Screens-->>MiddleBack: Layout + свойства
+        MiddleBack->>Context: Подготовить значения для нового экрана
+        Context-->>MiddleBack: Снапшот для nextScreenId
+        MiddleBack-->>UI: Экран #N + contextSnapshot
+        UI->>Widgets: Перерисовать с новым экраном
+        Widgets-->>UI: Обновлённый интерфейс
+    end

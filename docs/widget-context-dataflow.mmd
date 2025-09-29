@@ -1,0 +1,38 @@
+flowchart LR
+    subgraph UI
+        Client["Фронтенд
+(React / Compose)"]
+    end
+
+    subgraph MiddleBack["Миддл-бек"]
+        Router["Маршрутизация
+по графу"]
+        Composer["Сборка
+экрана"]
+    end
+
+    subgraph DataStores["Хранилища"]
+        Graph["Граф продукта"]
+        Screens["Каталог экранов"]
+        Context["Виртуальный контекст"]
+    end
+
+    subgraph External["Пользователь"]
+        User[("Действия
+пользователя")]
+    end
+
+    User -->|ввод / клики| Client
+    Client -->|event + outputs| Router
+    Router -->|выбор следующего экрана| Graph
+    Router -->|screenId| Composer
+    Composer -->|layout + состояние| Client
+    Graph -->|переходы| Router
+    Screens -->|описание экрана| Composer
+    Composer -->|запрос описания| Screens
+    Router -->|контекстные переменные| Context
+    Context -->|значения| Composer
+    Context -->|обновить значения| Router
+    Router -->|новые значения| Context
+    Client -->|запрос стартового экрана| Router
+    Composer -->|snapshot экрана| Client

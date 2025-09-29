@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" fill="none">
+  <defs>
+    <style>
+      .container { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 2; rx: 16; ry: 16; }
+      .node { fill: #ffffff; stroke: #94a3b8; stroke-width: 2; rx: 12; ry: 12; }
+      .title { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 600; fill: #0f172a; }
+      .label { font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 600; fill: #1e293b; }
+      .note { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; fill: #475569; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#3b82f6">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+  </defs>
+
+  <!-- Backend Container -->
+  <rect class="container" x="40" y="60" width="300" height="360" />
+  <text class="title" x="190" y="100" text-anchor="middle">Бэкенд</text>
+
+  <rect class="node" x="70" y="140" width="240" height="70" />
+  <text class="label" x="190" y="172" text-anchor="middle">Виртуальный контекст</text>
+  <text class="note" x="190" y="198" text-anchor="middle">значения переменных</text>
+
+  <rect class="node" x="70" y="240" width="240" height="70" />
+  <text class="label" x="190" y="272" text-anchor="middle">Описание экрана</text>
+  <text class="note" x="190" y="298" text-anchor="middle">структура + свойства виджетов</text>
+
+  <!-- Middle-back Service -->
+  <rect class="node" x="380" y="200" width="200" height="140" />
+  <text class="label" x="480" y="240" text-anchor="middle">Миддл-бек</text>
+  <text class="note" x="480" y="268" text-anchor="middle">склеивает контекст и экран</text>
+  <text class="note" x="480" y="294" text-anchor="middle">выбирает следующий экран по графу</text>
+  <text class="note" x="480" y="320" text-anchor="middle">возвращает снапшот значений</text>
+
+  <rect class="node" x="70" y="320" width="240" height="70" />
+  <text class="label" x="190" y="352" text-anchor="middle">Граф продукта</text>
+  <text class="note" x="190" y="378" text-anchor="middle">экраны и переходы</text>
+
+  <!-- Frontend Container -->
+  <rect class="container" x="620" y="60" width="300" height="360" />
+  <text class="title" x="770" y="100" text-anchor="middle">Фронтенд</text>
+
+  <rect class="node" x="650" y="140" width="240" height="70" />
+  <text class="label" x="770" y="172" text-anchor="middle">Рендерер</text>
+  <text class="note" x="770" y="198" text-anchor="middle">создаёт дерево компонента</text>
+
+  <rect class="node" x="650" y="240" width="240" height="70" />
+  <text class="label" x="770" y="272" text-anchor="middle">Виджеты</text>
+  <text class="note" x="770" y="298" text-anchor="middle">применяют привязки</text>
+
+  <rect class="node" x="650" y="340" width="240" height="70" />
+  <text class="label" x="770" y="372" text-anchor="middle">Диспетчер событий</text>
+  <text class="note" x="770" y="398" text-anchor="middle">собирает выходные данные</text>
+
+  <!-- Arrows -->
+  <path d="M 190 210 C 240 210 330 210 380 220" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="290" y="200" text-anchor="middle">значения контекста</text>
+
+  <path d="M 190 310 C 240 310 330 310 380 300" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="290" y="330" text-anchor="middle">описание экрана</text>
+
+  <path d="M 190 360 C 250 380 320 370 380 340" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="290" y="380" text-anchor="middle">правила переходов</text>
+
+  <path d="M 580 260 C 610 260 630 230 650 220" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="620" y="240" text-anchor="middle">снапшот экрана (текущий/следующий)</text>
+
+  <line x1="770" y1="210" x2="770" y2="240" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" />
+  <line x1="770" y1="310" x2="770" y2="340" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <path d="M 650 375 C 630 330 600 310 580 295" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="610" y="320" text-anchor="middle">выходные данные</text>
+
+  <path d="M 480 340 C 430 360 320 380 230 390" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrowhead)" />
+  <text class="note" x="320" y="400" text-anchor="middle">обновлённый контекст</text>
+</svg>

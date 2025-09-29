@@ -1,0 +1,410 @@
+{
+  "components": [
+    {
+      "id": "screen",
+      "type": "screen",
+      "parentId": null,
+      "children": ["topBar", "body", "bottomBar"],
+      "props": {},
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "720px",
+        "backgroundColor": "#f8fafc",
+        "padding": "0",
+        "gap": "0px"
+      },
+      "events": {}
+    },
+    {
+      "id": "topBar",
+      "type": "column",
+      "parentId": "screen",
+      "children": ["headerTitle", "headerSubtitle"],
+      "props": {
+        "section": "topBar",
+        "spacing": 12,
+        "padding": 24,
+        "alignItems": "flex-start",
+        "justifyContent": "center",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "width": "100%",
+        "borderBottom": "1px solid rgba(148, 163, 184, 0.12)"
+      },
+      "events": {}
+    },
+    {
+      "id": "headerTitle",
+      "type": "text",
+      "parentId": "topBar",
+      "children": [],
+      "props": {
+        "content": "{{screenName}} — подборка игр",
+        "variant": "heading",
+        "color": "#0f172a"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "26px",
+        "fontWeight": 700
+      },
+      "events": {}
+    },
+    {
+      "id": "headerSubtitle",
+      "type": "text",
+      "parentId": "topBar",
+      "children": [],
+      "props": {
+        "content": "Актуальный список бесплатных игр для ПК с платформы FreeToGame",
+        "variant": "body",
+        "color": "#475569"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "16px",
+        "maxWidth": "680px"
+      },
+      "events": {}
+    },
+    {
+      "id": "body",
+      "type": "column",
+      "parentId": "screen",
+      "children": ["gamesList"],
+      "props": {
+        "section": "body",
+        "spacing": 24,
+        "padding": 32,
+        "alignItems": "stretch",
+        "justifyContent": "flex-start",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "flex": "1 1 auto"
+      },
+      "events": {}
+    },
+    {
+      "id": "gamesList",
+      "type": "list",
+      "parentId": "body",
+      "children": ["cardContainer"],
+      "props": {
+        "variant": "unordered",
+        "items": {
+          "value": [],
+          "reference": "${gamesList}"
+        },
+        "itemAlias": "game"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "20px",
+        "listStyleType": "none",
+        "padding": 0,
+        "margin": 0
+      },
+      "events": {}
+    },
+    {
+      "id": "cardContainer",
+      "type": "container",
+      "parentId": "gamesList",
+      "children": ["cardRow"],
+      "props": {
+        "padding": 24,
+        "background": "#ffffff"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "borderRadius": "20px",
+        "border": "1px solid rgba(148, 163, 184, 0.16)",
+        "boxShadow": "0 18px 40px rgba(15, 23, 42, 0.08)"
+      },
+      "events": {}
+    },
+    {
+      "id": "cardRow",
+      "type": "row",
+      "parentId": "cardContainer",
+      "children": ["thumbnail", "detailsColumn"],
+      "props": {
+        "spacing": 20,
+        "padding": 0,
+        "alignItems": "stretch",
+        "justifyContent": "flex-start",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "width": "100%"
+      },
+      "events": {}
+    },
+    {
+      "id": "thumbnail",
+      "type": "image",
+      "parentId": "cardRow",
+      "children": [],
+      "props": {
+        "src": {
+          "value": "https://via.placeholder.com/320x200?text=Game",
+          "reference": "${game.thumbnail}"
+        },
+        "alt": {
+          "value": "Миниатюра игры",
+          "reference": "${game.title}"
+        }
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "width": "200px",
+        "height": "140px",
+        "objectFit": "cover",
+        "borderRadius": "16px"
+      },
+      "events": {}
+    },
+    {
+      "id": "detailsColumn",
+      "type": "column",
+      "parentId": "cardRow",
+      "children": ["gameTitle", "description", "metaRow", "publisherRow"],
+      "props": {
+        "spacing": 12,
+        "padding": 0,
+        "alignItems": "flex-start",
+        "justifyContent": "flex-start",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "flex": "1 1 auto"
+      },
+      "events": {}
+    },
+    {
+      "id": "gameTitle",
+      "type": "text",
+      "parentId": "detailsColumn",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Название игры",
+          "reference": "${game.title}"
+        },
+        "variant": "subheading",
+        "color": "#0f172a"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "22px",
+        "fontWeight": 600
+      },
+      "events": {}
+    },
+    {
+      "id": "description",
+      "type": "text",
+      "parentId": "detailsColumn",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Описание игры пока не загружено",
+          "reference": "${game.short_description}"
+        },
+        "variant": "body",
+        "color": "#475569"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "lineHeight": "1.6",
+        "maxWidth": "640px"
+      },
+      "events": {}
+    },
+    {
+      "id": "metaRow",
+      "type": "row",
+      "parentId": "detailsColumn",
+      "children": ["genreTag", "platformTag", "releaseTag"],
+      "props": {
+        "spacing": 12,
+        "padding": 0,
+        "alignItems": "center",
+        "justifyContent": "flex-start",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "flexWrap": "wrap"
+      },
+      "events": {}
+    },
+    {
+      "id": "genreTag",
+      "type": "text",
+      "parentId": "metaRow",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Жанр не указан",
+          "reference": "${game.genre}"
+        },
+        "variant": "caption",
+        "color": "#1e293b"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "background": "rgba(59, 130, 246, 0.12)",
+        "padding": "6px 14px",
+        "borderRadius": "999px",
+        "fontSize": "13px",
+        "fontWeight": 600
+      },
+      "events": {}
+    },
+    {
+      "id": "platformTag",
+      "type": "text",
+      "parentId": "metaRow",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Платформа не указана",
+          "reference": "${game.platform}"
+        },
+        "variant": "caption",
+        "color": "#1e293b"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "background": "rgba(16, 185, 129, 0.12)",
+        "padding": "6px 14px",
+        "borderRadius": "999px",
+        "fontSize": "13px",
+        "fontWeight": 600
+      },
+      "events": {}
+    },
+    {
+      "id": "releaseTag",
+      "type": "text",
+      "parentId": "metaRow",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Дата релиза неизвестна",
+          "reference": "${game.release_date}"
+        },
+        "variant": "caption",
+        "color": "#1e293b"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "background": "rgba(148, 163, 184, 0.18)",
+        "padding": "6px 14px",
+        "borderRadius": "999px",
+        "fontSize": "13px",
+        "fontWeight": 600
+      },
+      "events": {}
+    },
+    {
+      "id": "publisherRow",
+      "type": "row",
+      "parentId": "detailsColumn",
+      "children": ["publisherLabel", "publisherValue"],
+      "props": {
+        "spacing": 8,
+        "padding": 0,
+        "alignItems": "center",
+        "justifyContent": "flex-start",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {},
+      "events": {}
+    },
+    {
+      "id": "publisherLabel",
+      "type": "text",
+      "parentId": "publisherRow",
+      "children": [],
+      "props": {
+        "content": "Издатель:",
+        "variant": "caption",
+        "color": "#64748b"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "14px"
+      },
+      "events": {}
+    },
+    {
+      "id": "publisherValue",
+      "type": "text",
+      "parentId": "publisherRow",
+      "children": [],
+      "props": {
+        "content": {
+          "value": "Информация недоступна",
+          "reference": "${game.publisher}"
+        },
+        "variant": "caption",
+        "color": "#0f172a"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "14px",
+        "fontWeight": 600
+      },
+      "events": {}
+    },
+    {
+      "id": "bottomBar",
+      "type": "column",
+      "parentId": "screen",
+      "children": ["footerText"],
+      "props": {
+        "section": "bottomBar",
+        "spacing": 8,
+        "padding": 16,
+        "alignItems": "center",
+        "justifyContent": "center",
+        "background": "transparent"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "width": "100%",
+        "borderTop": "1px solid rgba(148, 163, 184, 0.12)"
+      },
+      "events": {}
+    },
+    {
+      "id": "footerText",
+      "type": "text",
+      "parentId": "bottomBar",
+      "children": [],
+      "props": {
+        "content": "Данные обновляются при каждом открытии конструктора",
+        "variant": "caption",
+        "color": "#64748b"
+      },
+      "position": { "x": 0, "y": 0 },
+      "style": {
+        "fontSize": "13px"
+      },
+      "events": {}
+    }
+  ]
+}

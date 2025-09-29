@@ -1,0 +1,169 @@
+{
+  "nodes": [
+    {
+      "id": "fetch-games",
+      "type": "action",
+      "position": { "x": -120, "y": 100 },
+      "data": {
+        "label": "Fetch Games List",
+        "actionType": "api",
+        "config": {
+          "endpoint": "https://www.freetogame.com/api/games?platform=pc",
+          "method": "GET",
+          "contextKey": "gamesList",
+          "schema": {
+            "id": "id",
+            "title": "title",
+            "thumbnail": "thumbnail",
+            "genre": "genre",
+            "platform": "platform",
+            "release_date": "release_date",
+            "publisher": "publisher",
+            "short_description": "short_description"
+          }
+        },
+        "inputBindings": [],
+        "outputBindings": [
+          { "id": "fetch-games-output-list", "name": "gamesList", "variable": "gamesList" }
+        ]
+      }
+    },
+    {
+      "id": "start",
+      "type": "screen",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "label": "Login Screen",
+        "screenId": "start",
+        "screenType": "form",
+        "status": "complete",
+        "description": "User authentication form with email and password",
+        "components": 3,
+        "actions": 2,
+        "inputBindings": [],
+        "outputBindings": []
+      }
+    },
+    {
+      "id": "validate",
+      "type": "action",
+      "position": { "x": 350, "y": 100 },
+      "data": {
+        "label": "Validate Credentials",
+        "actionType": "validation",
+        "config": {
+          "field": "email",
+          "validationType": "email"
+        },
+        "inputBindings": [
+          { "id": "validate-input-email", "name": "email", "variable": "" }
+        ],
+        "outputBindings": [
+          { "id": "validate-output-isValid", "name": "isValid", "variable": "" }
+        ]
+      }
+    },
+    {
+      "id": "api-auth",
+      "type": "action",
+      "position": { "x": 600, "y": 100 },
+      "data": {
+        "label": "Authenticate User",
+        "actionType": "api",
+        "config": {
+          "endpoint": "/auth/login",
+          "method": "POST"
+        },
+        "inputBindings": [
+          { "id": "api-input-email", "name": "email", "variable": "" },
+          { "id": "api-input-password", "name": "password", "variable": "" }
+        ],
+        "outputBindings": [
+          { "id": "api-output-token", "name": "token", "variable": "" },
+          { "id": "api-output-userId", "name": "userId", "variable": "" }
+        ]
+      }
+    },
+    {
+      "id": "dashboard",
+      "type": "screen",
+      "position": { "x": 850, "y": 50 },
+      "data": {
+        "label": "Dashboard",
+        "screenId": "dashboard",
+        "screenType": "display",
+        "status": "draft",
+        "description": "Main dashboard with analytics and navigation",
+        "components": 8,
+        "actions": 5,
+        "inputBindings": [],
+        "outputBindings": []
+      }
+    },
+    {
+      "id": "error-screen",
+      "type": "screen",
+      "position": { "x": 850, "y": 200 },
+      "data": {
+        "label": "Error Screen",
+        "screenId": "error-screen",
+        "screenType": "system",
+        "status": "draft",
+        "description": "Displays authentication errors and retry options",
+        "components": 4,
+        "actions": 1,
+        "inputBindings": [],
+        "outputBindings": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-fetch-start",
+      "source": "fetch-games",
+      "target": "start",
+      "type": "custom",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": { "trigger": "onLoad" },
+      "label": "Preload Games"
+    },
+    {
+      "id": "e1-2",
+      "source": "start",
+      "target": "validate",
+      "type": "custom",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": { "trigger": "onSubmit" },
+      "label": "Form Submit"
+    },
+    {
+      "id": "e2-3",
+      "source": "validate",
+      "target": "api-auth",
+      "type": "custom",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": { "trigger": "onSuccess" },
+      "label": "Valid Data"
+    },
+    {
+      "id": "e3-4",
+      "source": "api-auth",
+      "target": "dashboard",
+      "type": "custom",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": { "trigger": "onSuccess" },
+      "style": { "stroke": "#16a34a" },
+      "label": "Auth Success"
+    },
+    {
+      "id": "e3-5",
+      "source": "api-auth",
+      "target": "error-screen",
+      "type": "custom",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": { "trigger": "onError" },
+      "style": { "stroke": "#dc2626" },
+      "label": "Auth Failed"
+    }
+  ]
+}

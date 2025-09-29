@@ -1,0 +1,6 @@
+fastapi==0.100.0
+uvicorn==0.23.0
+pydantic==2.6.0
+pytest==7.4.2
+
+# Notes: use 'uvicorn server.main:app --reload' to run in development

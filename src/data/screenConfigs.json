@@ -1,0 +1,14 @@
+{
+  "defaultScreens": {
+    "gameCatalog": {
+      "id": "gameCatalog",
+      "name": "Игровой каталог",
+      "components": [],
+      "graphData": {
+        "nodes": [],
+        "edges": []
+      },
+      "variableDefinitions": []
+    }
+  }
+}

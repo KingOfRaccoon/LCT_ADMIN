@@ -1,0 +1,16 @@
+flowchart TD
+  CONTEXT[CONTEXT]
+  UI[UI]
+  DATA[DATA]
+  BIND[BINDING]
+  PATCH[PATCH]
+  ALGO[ALGO]
+
+  CONTEXT --> UI
+  CONTEXT --> DATA
+  CONTEXT --> BIND
+  PATCH --> ALGO
+  ALGO --> BIND
+  ALGO --> DATA
+
+  %% Legend: ALGO clones context, resolves bindings and writes values

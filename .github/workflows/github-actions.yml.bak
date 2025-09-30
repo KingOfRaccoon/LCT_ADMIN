@@ -1,10 +1,10 @@
-name: Build and Deploy React App to Server
+name: Build and Deploy React App
 
 on:
   push:
     branches:
-      - master
-  workflow_dispatch:
+      - main   # запуск при пуше в ветку main
+  workflow_dispatch: # возможность ручного запуска
 
 jobs:
   build:
@@ -12,12 +12,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 22.12.0
+          node-version: 18
 
       - name: Install dependencies
         run: npm ci
@@ -25,14 +25,11 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Archive production build
-        run: tar -czf build.tar.gz build
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload production-ready build
+        uses: actions/upload-artifact@v3
         with:
           name: react-build
-          path: build.tar.gz
+          path: dist
 
   deploy:
     runs-on: ubuntu-latest
@@ -40,31 +37,13 @@ jobs:
 
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: react-build
-          path: .
+          path: dist
 
-      - name: Copy build to server
-        uses: appleboy/scp-action@v0.1.7
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "build.tar.gz"
-          target: "~/react-app/"
-
-      - name: Deploy on server
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            cd ~/react-app
-            tar -xzf build.tar.gz
-            rm build.tar.gz
-            # переместим содержимое в папку public_html или нужную директорию
-            rm -rf /var/www/react-app/*
-            mv build/* /var/www/react-app/
-            echo "✅ Deployment finished!"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

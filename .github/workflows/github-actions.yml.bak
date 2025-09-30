@@ -3,7 +3,7 @@ name: Build and Deploy React App
 on:
   push:
     branches:
-      - main   # запуск при пуше в ветку main
+      - master   # запуск при пуше в ветку main
   workflow_dispatch: # возможность ручного запуска
 
 jobs:

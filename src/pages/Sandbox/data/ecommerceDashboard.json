@@ -1,125 +1,213 @@
 {
-  "id": "ecommerce-dashboard",
-  "name": "E-commerce Dashboard",
-  "description": "Стартовая панель для анализа заказов и покупателей интернет-магазина",
+  "id": "email-validation-sandbox",
+  "name": "Проверка email",
+  "description": "Демо-песочница с техническим состоянием для проверки корректности email",
   "initialContext": {
     "ui": {
       "screen": {
-        "title": "E-commerce Dashboard"
+        "title": "Проверка email"
       },
       "actions": {
-        "submit": "Создать заказ",
-        "cancel": "Отменить заказ",
-        "restart": "Новый клиент"
-      },
-      "form": {
-        "promoPlaceholder": "У меня есть промокод"
+        "submit": "Проверить email",
+        "retry": "Попробовать снова"
       },
       "notifications": {
-        "lastAction": "Последнее действие: заказ создан"
+        "lastAction": "Введите адрес электронной почты, чтобы проверить его формат"
       }
     },
     "data": {
-      "order": {
-        "status": "draft",
-        "total": 16110,
-        "totalFormatted": "16 110 ₽"
-      },
-      "cart": {
-        "items": [
-          {
-            "title": "Тариф «Премиум» — 9 990 ₽",
-            "price": 9990,
-            "priceFormatted": "9 990 ₽"
-          },
-          {
-            "title": "Сопровождение запуска — 3 000 ₽",
-            "price": 3000,
-            "priceFormatted": "3 000 ₽"
-          },
-          {
-            "title": "Сопровождение запуска — 3 120 ₽",
-            "price": 3120,
-            "priceFormatted": "3 120 ₽"
-          }
-        ]
-      },
       "user": {
-        "email": "founder@example.com"
+        "email": ""
+      },
+      "validation": {
+        "status": "idle",
+        "message": "Укажите адрес электронной почты и нажмите кнопку проверки."
+      },
+      "external": {
+        "prefetch": {
+          "title": "Загрузка рекомендаций…",
+          "description": "Мы запрашиваем небольшой совет от внешнего сервиса."
+        },
+        "success": {
+          "title": "",
+          "description": ""
+        }
       }
     },
     "inputs": {
-      "email": "",
-      "promo": ""
+      "email": ""
+    }
+  },
+  "variableSchemas": {
+    "inputs.email": {
+      "type": "string",
+      "description": "Текущий email, введённый пользователем"
+    },
+    "data.validation": {
+      "type": "object",
+      "schema": {
+        "status": "string",
+        "message": "string"
+      }
+    },
+    "data.user.email": {
+      "type": "string",
+      "description": "Последний успешно проверенный email"
+    },
+    "data.external.prefetch": {
+      "type": "object",
+      "schema": {
+        "title": "string",
+        "description": "string"
+      }
+    },
+    "data.external.success": {
+      "type": "object",
+      "schema": {
+        "title": "string",
+        "description": "string"
+      }
     }
   },
   "nodes": [
     {
-      "id": "checkout",
-      "label": "Оформление заказа",
-      "screenId": "screen-checkout",
+      "id": "email-entry",
+      "label": "Ввод email",
+      "type": "screen",
+      "screenId": "screen-email-entry",
       "start": true,
       "edges": [
         {
-          "id": "edge-submit-success",
-          "label": "Оплатить успешно",
-          "target": "success",
-          "summary": "Переход на экран успеха, обновляет статус заказа",
+          "id": "edge-email-submit",
+          "label": "Проверить email",
+          "event": "checkEmail",
+          "summary": "Передаёт введённый email в технический узел проверки",
+          "target": "validate-email",
           "contextPatch": {
-            "data.order.status": "paid",
-            "data.order.total": 16110,
-            "data.order.totalFormatted": "16 110 ₽",
-            "ui.notifications.lastAction": "Платёж завершён, чек отправлен клиенту"
+            "data.user.email": {
+              "reference": "${inputs.email}",
+              "value": ""
+            },
+            "data.validation.status": "checking",
+            "data.validation.message": "Проверяем корректность адреса…"
+          }
+        }
+      ]
+    },
+    {
+      "id": "validate-email",
+      "label": "Проверка email",
+      "type": "action",
+      "data": {
+        "actionType": "condition",
+        "config": {
+          "conditions": [
+            {
+              "id": "is-valid-email",
+              "edgeId": "edge-email-valid",
+              "type": "regex",
+              "description": "Соответствует формату email",
+              "pattern": "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+              "flags": "i",
+              "source": {
+                "reference": "${inputs.email}",
+                "value": ""
+              }
+            },
+            {
+              "id": "is-empty-email",
+              "edgeId": "edge-email-empty",
+              "type": "empty",
+              "description": "Поле email пустое",
+              "source": {
+                "reference": "${inputs.email}",
+                "value": ""
+              }
+            }
+          ],
+          "fallbackEdgeId": "edge-email-invalid"
+        }
+      },
+      "edges": [
+        {
+          "id": "edge-email-valid",
+          "label": "Email корректен",
+          "target": "email-valid",
+          "summary": "Ветка успеха — адрес соответствует формату",
+          "contextPatch": {
+            "data.validation.status": "success",
+            "data.validation.message": "Адрес выглядит корректно",
+            "ui.notifications.lastAction": "Email подтверждён"
           }
         },
         {
-          "id": "edge-submit-cancel",
-          "label": "Отменить заказ",
-          "target": "cancelled",
-          "summary": "Клиент отменяет оплату и возвращается в салес-воронку",
+          "id": "edge-email-empty",
+          "label": "Email пустой",
+          "target": "email-invalid",
+          "summary": "Ветка ошибки — email не заполнен",
           "contextPatch": {
-            "data.order.status": "cancelled",
-            "ui.notifications.lastAction": "Заказ перенесён в отменённые"
+            "data.validation.status": "error",
+            "data.validation.message": "Заполните поле email, чтобы продолжить",
+            "ui.notifications.lastAction": "Email не заполнен"
+          }
+        },
+        {
+          "id": "edge-email-invalid",
+          "label": "Email некорректен",
+          "target": "email-invalid",
+          "summary": "Ветка ошибки — email в неверном формате",
+          "contextPatch": {
+            "data.validation.status": "error",
+            "data.validation.message": "Email указан в неверном формате",
+            "ui.notifications.lastAction": "Email указан некорректно"
           }
         }
       ]
     },
     {
-      "id": "success",
-      "label": "Оплата прошла",
-      "screenId": "screen-success",
+      "id": "email-valid",
+      "label": "Email подтверждён",
+      "type": "screen",
+      "screenId": "screen-email-valid",
       "edges": [
         {
-          "id": "edge-success-new-order",
-          "label": "Оформить новый заказ",
-          "target": "checkout",
-          "summary": "Возврат на основной экран с очисткой статуса",
+          "id": "edge-valid-retry",
+          "label": "Проверить другой email",
+          "event": "retryFromSuccess",
+          "summary": "Возвращает на экран ввода и очищает состояние",
+          "target": "email-entry",
           "contextPatch": {
-            "data.order.status": "draft",
-            "ui.notifications.lastAction": "Создан новый драфт заказа"
+            "inputs.email": "",
+            "data.user.email": "",
+            "data.validation.status": "idle",
+            "data.validation.message": "Укажите адрес электронной почты и нажмите кнопку проверки.",
+            "ui.notifications.lastAction": "Введите новый адрес для проверки"
           }
         }
       ]
     },
     {
-      "id": "cancelled",
-      "label": "Заказ отменён",
-      "screenId": "screen-cancelled",
+      "id": "email-invalid",
+      "label": "Email некорректен",
+      "type": "screen",
+      "screenId": "screen-email-invalid",
       "edges": [
         {
-          "id": "edge-cancelled-retry",
-          "label": "Вернуться к оплате",
-          "target": "checkout",
-          "summary": "Повторная попытка оплаты, сбрасывает статус заказа",
+          "id": "edge-invalid-retry",
+          "label": "Исправить email",
+          "event": "retryFromError",
+          "summary": "Возвращает на экран ввода для новой проверки",
+          "target": "email-entry",
           "contextPatch": {
-            "data.order.status": "draft",
-            "ui.notifications.lastAction": "Клиент вернулся к оформлению"
+            "data.validation.status": "idle",
+            "data.validation.message": "Исправьте email и попробуйте снова",
+            "ui.notifications.lastAction": "Ожидание нового email"
           }
         }
       ]
     }
   ],
-  "screens": {
+  "legacyScreens": {
     "screen-checkout": {
       "id": "screen-cuhn04-1758927807107",
       "type": "Screen",
@@ -1901,6 +1989,421 @@
         }
       },
       "references": {}
+    }
+  },
+  "screens": {
+    "screen-email-entry": {
+      "id": "screen-email-entry",
+      "type": "Screen",
+      "name": "Ввод email",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "480px",
+        "backgroundColor": "#ffffff",
+        "borderRadius": "32px",
+        "border": "1px solid rgba(148, 163, 184, 0.14)",
+        "boxShadow": "0 20px 32px rgba(15, 23, 42, 0.16)",
+        "padding": "0px"
+      },
+      "sections": {
+        "content": {
+          "id": "section-entry-content",
+          "type": "Section",
+          "properties": {
+            "slot": "content",
+            "padding": 48,
+            "spacing": 24,
+            "alignItems": "stretch",
+            "justifyContent": "flex-start"
+          },
+          "style": {
+            "width": "100%",
+            "gap": "24px"
+          },
+          "children": [
+            {
+              "id": "text-entry-title",
+              "type": "text",
+              "properties": {
+                "content": "Проверка email",
+                "variant": "heading"
+              },
+              "style": {
+                "fontSize": "28px",
+                "fontWeight": 600,
+                "color": "#0f172a"
+              },
+              "children": []
+            },
+            {
+              "id": "text-entry-description",
+              "type": "text",
+              "properties": {
+                "content": "Введите адрес электронной почты. Техническое состояние проверит корректность формата и выберет подходящий экран.",
+                "variant": "body"
+              },
+              "style": {
+                "fontSize": "16px",
+                "lineHeight": "24px",
+                "color": "#475569"
+              },
+              "children": []
+            },
+            {
+              "id": "column-entry-prefetch",
+              "type": "column",
+              "properties": {
+                "spacing": 8,
+                "padding": 20,
+                "alignItems": "flex-start",
+                "justifyContent": "flex-start"
+              },
+              "style": {
+                "width": "100%",
+                "background": "#f8fafc",
+                "border": "1px solid rgba(148, 163, 184, 0.18)",
+                "borderRadius": "18px"
+              },
+              "children": [
+                {
+                  "id": "text-entry-prefetch-title",
+                  "type": "text",
+                  "properties": {
+                    "content": {
+                      "reference": "${data.external.prefetch.title}",
+                      "value": "Совет перед проверкой"
+                    },
+                    "variant": "subtitle"
+                  },
+                  "style": {
+                    "fontSize": "18px",
+                    "fontWeight": 600,
+                    "color": "#0f172a"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "text-entry-prefetch-description",
+                  "type": "text",
+                  "properties": {
+                    "content": {
+                      "reference": "${data.external.prefetch.description}",
+                      "value": "Мы запросим подсказку у внешнего сервиса."
+                    },
+                    "variant": "body"
+                  },
+                  "style": {
+                    "fontSize": "15px",
+                    "lineHeight": "22px",
+                    "color": "#334155"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "column-entry-form",
+              "type": "column",
+              "properties": {
+                "spacing": 12,
+                "padding": 0,
+                "alignItems": "flex-start",
+                "justifyContent": "flex-start"
+              },
+              "style": {
+                "background": "transparent"
+              },
+              "children": [
+                {
+                  "id": "input-email",
+                  "type": "input",
+                  "properties": {
+                    "name": "email",
+                    "type": "email",
+                    "placeholder": "user@example.com",
+                    "required": true,
+                    "helperText": {
+                      "reference": "${data.validation.message}",
+                      "value": ""
+                    },
+                    "value": {
+                      "reference": "${inputs.email}",
+                      "value": ""
+                    }
+                  },
+                  "style": {
+                    "width": "100%",
+                    "height": "48px",
+                    "borderRadius": "14px",
+                    "border": "1px solid rgba(148, 163, 184, 0.32)",
+                    "padding": "0 18px",
+                    "fontSize": "16px"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "row-entry-actions",
+                  "type": "row",
+                  "properties": {
+                    "spacing": 12,
+                    "padding": 0,
+                    "alignItems": "center",
+                    "justifyContent": "flex-start"
+                  },
+                  "style": {
+                    "width": "100%"
+                  },
+                  "children": [
+                    {
+                      "id": "button-check-email",
+                      "type": "button",
+                      "properties": {
+                        "text": "Проверить email",
+                        "variant": "primary",
+                        "size": "medium",
+                        "event": "checkEmail"
+                      },
+                      "style": {
+                        "padding": "0 28px",
+                        "height": "46px"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "screen-email-valid": {
+      "id": "screen-email-valid",
+      "type": "Screen",
+      "name": "Email корректен",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "320px",
+        "backgroundColor": "#ffffff",
+        "borderRadius": "32px",
+        "border": "1px solid rgba(34, 197, 94, 0.24)",
+        "boxShadow": "0 20px 32px rgba(22, 163, 74, 0.2)",
+        "padding": "0px"
+      },
+      "sections": {
+        "content": {
+          "id": "section-valid-content",
+          "type": "Section",
+          "properties": {
+            "slot": "content",
+            "padding": 48,
+            "spacing": 20,
+            "alignItems": "flex-start",
+            "justifyContent": "flex-start"
+          },
+          "style": {
+            "width": "100%"
+          },
+          "children": [
+            {
+              "id": "text-valid-title",
+              "type": "text",
+              "properties": {
+                "content": "Email подтверждён",
+                "variant": "heading"
+              },
+              "style": {
+                "fontSize": "28px",
+                "fontWeight": 600,
+                "color": "#047857"
+              },
+              "children": []
+            },
+            {
+              "id": "text-valid-message",
+              "type": "text",
+              "properties": {
+                "content": {
+                  "reference": "${data.validation.message}",
+                  "value": "Email выглядит корректно"
+                },
+                "variant": "body"
+              },
+              "style": {
+                "fontSize": "16px",
+                "lineHeight": "24px",
+                "color": "#0f172a"
+              },
+              "children": []
+            },
+            {
+              "id": "text-valid-email",
+              "type": "text",
+              "properties": {
+                "content": {
+                  "reference": "${data.user.email}",
+                  "value": ""
+                },
+                "variant": "caption"
+              },
+              "style": {
+                "fontSize": "18px",
+                "fontWeight": 500,
+                "color": "#0f172a"
+              },
+              "children": []
+            },
+            {
+              "id": "column-success-external",
+              "type": "column",
+              "properties": {
+                "spacing": 6,
+                "padding": 18,
+                "alignItems": "flex-start",
+                "justifyContent": "flex-start"
+              },
+              "style": {
+                "width": "100%",
+                "background": "#ecfdf5",
+                "border": "1px solid rgba(16, 185, 129, 0.32)",
+                "borderRadius": "16px"
+              },
+              "children": [
+                {
+                  "id": "text-success-external-title",
+                  "type": "text",
+                  "properties": {
+                    "content": {
+                      "reference": "${data.external.success.title}",
+                      "value": "Совет по дальнейшим действиям"
+                    },
+                    "variant": "subtitle"
+                  },
+                  "style": {
+                    "fontSize": "17px",
+                    "fontWeight": 600,
+                    "color": "#047857"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "text-success-external-description",
+                  "type": "text",
+                  "properties": {
+                    "content": {
+                      "reference": "${data.external.success.description}",
+                      "value": ""
+                    },
+                    "variant": "body"
+                  },
+                  "style": {
+                    "fontSize": "15px",
+                    "lineHeight": "22px",
+                    "color": "#0f172a"
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "button-valid-retry",
+              "type": "button",
+              "properties": {
+                "text": "Проверить другой email",
+                "variant": "secondary",
+                "size": "medium",
+                "event": "retryFromSuccess"
+              },
+              "style": {
+                "padding": "0 24px",
+                "height": "46px"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
+    },
+    "screen-email-invalid": {
+      "id": "screen-email-invalid",
+      "type": "Screen",
+      "name": "Email некорректен",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "320px",
+        "backgroundColor": "#ffffff",
+        "borderRadius": "32px",
+        "border": "1px solid rgba(248, 113, 113, 0.32)",
+        "boxShadow": "0 20px 32px rgba(239, 68, 68, 0.24)",
+        "padding": "0px"
+      },
+      "sections": {
+        "content": {
+          "id": "section-invalid-content",
+          "type": "Section",
+          "properties": {
+            "slot": "content",
+            "padding": 48,
+            "spacing": 20,
+            "alignItems": "flex-start",
+            "justifyContent": "flex-start"
+          },
+          "style": {
+            "width": "100%"
+          },
+          "children": [
+            {
+              "id": "text-invalid-title",
+              "type": "text",
+              "properties": {
+                "content": "Email некорректен",
+                "variant": "heading"
+              },
+              "style": {
+                "fontSize": "28px",
+                "fontWeight": 600,
+                "color": "#b91c1c"
+              },
+              "children": []
+            },
+            {
+              "id": "text-invalid-message",
+              "type": "text",
+              "properties": {
+                "content": {
+                  "reference": "${data.validation.message}",
+                  "value": "Email указан неверно"
+                },
+                "variant": "body"
+              },
+              "style": {
+                "fontSize": "16px",
+                "lineHeight": "24px",
+                "color": "#0f172a"
+              },
+              "children": []
+            },
+            {
+              "id": "button-invalid-retry",
+              "type": "button",
+              "properties": {
+                "text": "Исправить email",
+                "variant": "primary",
+                "size": "medium",
+                "event": "retryFromError"
+              },
+              "style": {
+                "padding": "0 24px",
+                "height": "46px"
+              },
+              "children": []
+            }
+          ]
+        }
+      }
     }
   }
 }

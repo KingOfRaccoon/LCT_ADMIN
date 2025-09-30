@@ -20,6 +20,7 @@ const ACTIONS = {
   SET_VARIABLE_SCHEMAS: 'SET_VARIABLE_SCHEMAS',
   RESET_VARIABLE_SCHEMAS: 'RESET_VARIABLE_SCHEMAS',
   ADD_ACTION_NODE: 'ADD_ACTION_NODE',
+  ADD_NODE: 'ADD_NODE',
   UPDATE_NODE: 'UPDATE_NODE',
   DELETE_NODE: 'DELETE_NODE',
   ADD_EDGE: 'ADD_EDGE',
@@ -312,6 +313,50 @@ function virtualContextReducer(state, action) {
         graphData: action.payload
       };
 
+    case ACTIONS.ADD_NODE: {
+      const incomingNode = action.payload && typeof action.payload === 'object'
+        ? action.payload
+        : {};
+      const nodeId = incomingNode.id || uuidv4();
+      const existingIndex = state.graphData.nodes.findIndex((node) => node.id === nodeId);
+      const normalizedNode = {
+        id: nodeId,
+        type: incomingNode.type || 'default',
+        data: incomingNode.data || {},
+        position: incomingNode.position || { x: 0, y: 0 },
+        ...incomingNode,
+        id: nodeId
+      };
+
+      if (existingIndex !== -1) {
+        const nextNodes = [...state.graphData.nodes];
+        nextNodes[existingIndex] = {
+          ...nextNodes[existingIndex],
+          ...normalizedNode,
+          data: {
+            ...nextNodes[existingIndex]?.data,
+            ...normalizedNode.data
+          }
+        };
+
+        return {
+          ...state,
+          graphData: {
+            ...state.graphData,
+            nodes: nextNodes
+          }
+        };
+      }
+
+      return {
+        ...state,
+        graphData: {
+          ...state.graphData,
+          nodes: [...state.graphData.nodes, normalizedNode]
+        }
+      };
+    }
+
     case ACTIONS.ADD_ACTION_NODE: {
       const actionNode = {
         id: uuidv4(),
@@ -531,6 +576,13 @@ export function VirtualContextProvider({ children }) {
     });
   }, []);
 
+  const addNode = useCallback((nodeData) => {
+    dispatch({
+      type: ACTIONS.ADD_NODE,
+      payload: nodeData
+    });
+  }, []);
+
   const updateNode = useCallback((id, updates) => {
     dispatch({
       type: ACTIONS.UPDATE_NODE,
@@ -680,7 +732,8 @@ export function VirtualContextProvider({ children }) {
     setGraphData,
     setVariableSchemas,
     resetVariableSchemas,
-    addActionNode,
+  addActionNode,
+  addNode,
     updateNode,
     deleteNode,
     addEdge,

@@ -100,10 +100,29 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Run unit and integration tests
+npm test
 ```
 
 ### Development Server
 The application runs on `http://localhost:5173` by default.
+
+### Testing & Quality
+
+- **Node test runner:** `npm test` executes unit and integration suites across the sandbox server and front-end bindings.
+- **Linting:** `npm run lint` keeps JavaScript and JSX consistent with the shared ESLint config.
+
+### Component Playground
+
+- `npm run playground` launches a Ladle-powered catalog with interactive Screen Builder blueprints and widget presets.
+- `npm run playground:build` produces a static build you can host alongside the main app for design reviews.
+- Stories live in `src/playground/stories` and automatically apply the shared design tokens for visual parity with the builder canvas.
+
+### Debug logging
+
+- Set `VITE_VC_TRACE=true` (for Vite) or `VC_TRACE=true` (for Node-based sandboxes/tests) to enable verbose logging via `src/utils/logger.js`.
+- Toggle logging at runtime in the browser console with `window.__VC_TRACE__ = true`.
 
 ## 🎨 Design Tokens & Cross-Platform Styling
 

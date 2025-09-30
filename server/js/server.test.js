@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { startServer } from './server.js';
+
+process.env.SANDBOX_FETCH_DISABLED = '1';
+
+const { startServer } = await import('./server.js');
 
 const waitForServer = (instance) => new Promise((resolve, reject) => {
   const onError = (err) => {
@@ -95,54 +98,104 @@ describe('sandbox js server', () => {
     return { response, body };
   };
 
-  it('returns checkout screen and context on /api/start/', async () => {
+  it('возвращает экран ввода email на /api/start/', async () => {
     const { response, body } = await request('/api/start/');
     assert.equal(response.status, 200);
     assert.ok(body);
-  assert.equal(body?.screen?.id, 'screen-cuhn04-1758927807107');
-    assert.equal(body?.context?.state?.status, 'draft');
+    assert.equal(body?.screen?.id, 'screen-email-entry');
+    assert.equal(body?.context?.state?.status, 'idle');
+    assert.equal(body?.context?.state?.title, 'Ввод email');
+    assert.equal(body?.context?.state?.message, 'Укажите адрес электронной почты и нажмите кнопку проверки.');
+    assert.deepEqual(body?.context?.data?.external?.prefetch, {
+      title: 'Совет перед проверкой',
+      description: 'Убедитесь, что адрес содержит @ и домен, прежде чем продолжить.'
+    });
 
-  const submitButton = findComponentById(body?.screen, 'button-3yqrdr-1758927807107');
-  assert.ok(submitButton, 'submit button exists');
-  assert.equal(submitButton?.properties?.event ?? submitButton?.props?.event ?? submitButton?.event, 'pay');
+    const emailInput = findComponentById(body?.screen, 'input-email');
+    assert.ok(emailInput, 'email input exists');
+    assert.equal(emailInput?.properties?.name, 'email');
 
-  const cancelButton = findComponentById(body?.screen, 'button-krym27-1758927807107');
-  assert.ok(cancelButton, 'cancel button exists');
-  assert.equal(cancelButton?.properties?.event ?? cancelButton?.props?.event ?? cancelButton?.event, 'cancel');
+    const submitButton = findComponentById(body?.screen, 'button-check-email');
+    assert.ok(submitButton, 'submit button exists');
+    assert.equal(submitButton?.properties?.event ?? submitButton?.props?.event ?? submitButton?.event, 'checkEmail');
+
+    const prefetchColumn = findComponentById(body?.screen, 'column-entry-prefetch');
+    assert.ok(prefetchColumn, 'prefetch column exists');
+    const prefetchTitle = findComponentById(body?.screen, 'text-entry-prefetch-title');
+    assert.ok(prefetchTitle, 'prefetch title exists');
+    assert.equal(prefetchTitle?.properties?.content?.value ?? prefetchTitle?.properties?.content, 'Совет перед проверкой');
   });
 
-  it('handles pay event and returns success screen', async () => {
+  it('обрабатывает событие checkEmail и возвращает экран успеха', async () => {
     const params = new URLSearchParams({
-      event: 'pay',
-      email: 'buyer@example.com',
-      promo: 'SALE10'
+      event: 'checkEmail',
+      email: 'user@example.com'
     });
     const { response, body } = await request(`/api/action?${params.toString()}`);
     assert.equal(response.status, 200);
-  assert.equal(body?.screen?.id, 'screen-success-1758927807107');
-    assert.equal(body?.context?.state?.status, 'paid');
-    assert.equal(body?.context?.inputs?.email, 'buyer@example.com');
+    assert.equal(body?.screen?.id, 'screen-email-valid');
+    assert.equal(body?.context?.state?.status, 'success');
+    assert.equal(body?.context?.state?.message, 'Адрес выглядит корректно');
+    assert.equal(body?.context?.inputs?.email, 'user@example.com');
+    assert.deepEqual(body?.context?.data?.external?.prefetch, {
+      title: 'Совет перед проверкой',
+      description: 'Убедитесь, что адрес содержит @ и домен, прежде чем продолжить.'
+    });
+    assert.deepEqual(body?.context?.data?.external?.success, {
+      title: 'Совет по дальнейшим шагам',
+      description: 'Используйте подтверждённый email, чтобы отправить приветственное письмо или запросить дополнительную информацию.'
+    });
     assert.ok(
       Array.isArray(body?.context?.state?.details)
-        && body.context.state.details.some((line) => line.includes('промокод') || line.includes('SALE10')),
-      'details include promo mention'
+        && body.context.state.details.some((line) => line.includes('Email: user@example.com')),
+      'details include resolved email'
     );
   });
 
-  it('handles cancel event and returns cancelled screen', async () => {
+  it('возвращает экран ошибки, если email пустой', async () => {
     const params = new URLSearchParams({
-      event: 'cancel',
-      email: 'client@example.com'
+      event: 'checkEmail',
+      email: '  '
     });
     const { response, body } = await request(`/api/action?${params.toString()}`);
     assert.equal(response.status, 200);
-  assert.equal(body?.screen?.id, 'screen-cancelled-1758927807107');
-    assert.equal(body?.context?.state?.status, 'cancelled');
-    assert.equal(body?.context?.inputs?.email, 'client@example.com');
+    assert.equal(body?.screen?.id, 'screen-email-invalid');
+    assert.equal(body?.context?.state?.status, 'error');
+    assert.equal(body?.context?.state?.message, 'Заполните поле email, чтобы продолжить');
+    assert.equal(body?.context?.inputs?.email, '');
+    assert.equal(body?.context?.data?.external?.success?.title ?? '', '');
+    assert.equal(body?.context?.data?.external?.success?.description ?? '', '');
     assert.ok(
       Array.isArray(body?.context?.state?.details)
-        && body.context.state.details.some((line) => line.includes('email клиента')),
-      'details include email mention'
+        && body.context.state.details.some((line) => line.includes('Заполните поле email')),
+      'details contain empty email warning'
     );
+  });
+
+  it('возвращает экран ошибки при некорректном email', async () => {
+    const params = new URLSearchParams({
+      event: 'checkEmail',
+      email: 'user@invalid'
+    });
+    const { response, body } = await request(`/api/action?${params.toString()}`);
+    assert.equal(response.status, 200);
+    assert.equal(body?.screen?.id, 'screen-email-invalid');
+    assert.equal(body?.context?.state?.status, 'error');
+    assert.equal(body?.context?.state?.message, 'Email указан в неверном формате');
+  });
+
+  it('сбрасывает состояние при retryFromError', async () => {
+    const params = new URLSearchParams({
+      event: 'retryFromError'
+    });
+    const { response, body } = await request(`/api/action?${params.toString()}`);
+    assert.equal(response.status, 200);
+    assert.equal(body?.screen?.id, 'screen-email-entry');
+    assert.equal(body?.context?.state?.status, 'idle');
+    assert.equal(body?.context?.inputs?.email, '');
+    assert.deepEqual(body?.context?.data?.external?.prefetch, {
+      title: 'Совет перед проверкой',
+      description: 'Убедитесь, что адрес содержит @ и домен, прежде чем продолжить.'
+    });
   });
 });

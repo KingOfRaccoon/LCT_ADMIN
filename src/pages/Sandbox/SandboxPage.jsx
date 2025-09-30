@@ -118,6 +118,49 @@ const describePatch = (patch, context) => {
   return pairs;
 };
 
+const resolveConditionSourceValue = (condition, context) => {
+  if (!condition || typeof condition !== 'object') {
+    return undefined;
+  }
+
+  const { source, path, fallback, value } = condition;
+
+  if (source !== undefined) {
+    if (isBindingValue(source)) {
+      return resolveBindingValue(source, context, fallback);
+    }
+    if (typeof source === 'string') {
+      if (source.startsWith('${') && source.endsWith('}')) {
+        return resolveBindingValue({ reference: source, value: fallback }, context, fallback);
+      }
+      return source;
+    }
+    return source;
+  }
+
+  if (typeof path === 'string' && path.trim().length > 0) {
+    return getContextValue(context, path.trim());
+  }
+
+  return value;
+};
+
+const isEmptyValue = (value) => {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length === 0;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value).length === 0;
+  }
+  return false;
+};
+
 const getInitialNodeId = (product) => (
   product.nodes.find((node) => node.start)?.id
   ?? product.nodes[0]?.id
@@ -184,11 +227,21 @@ const SandboxPage = () => {
   }, [runtimeProduct]);
 
   const product = runtimeProduct || ecommerceDashboard;
+  const nodesById = useMemo(() => {
+    const map = new Map();
+    (product?.nodes ?? []).forEach((node) => {
+      if (node && typeof node === 'object' && node.id) {
+        map.set(node.id, node);
+      }
+    });
+    return map;
+  }, [product]);
   const isOfflineMode = Boolean(runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
   const variableSchemas = useMemo(
     () => runtimeSchemas || product.variableSchemas || {},
     [product, runtimeSchemas]
   );
+  const getNodeById = useCallback((nodeId) => nodesById.get(nodeId) ?? null, [nodesById]);
   const initialNodeId = useMemo(() => getInitialNodeId(product), [product]);
 
   const [currentNodeId, setCurrentNodeId] = useState(initialNodeId);
@@ -213,8 +266,8 @@ const SandboxPage = () => {
   const isApiReady = apiMode === 'ready' && Boolean(apiData);
 
   const currentNode = useMemo(
-    () => product.nodes.find((node) => node.id === currentNodeId),
-    [product, currentNodeId]
+    () => getNodeById(currentNodeId),
+    [getNodeById, currentNodeId]
   );
   const currentScreen = useMemo(
     () => product.screens[currentNode?.screenId] ?? null,
@@ -259,6 +312,17 @@ const SandboxPage = () => {
         };
       }
 
+      if (actionType === 'condition') {
+        const config = currentNode.data?.config || {};
+        const conditions = Array.isArray(config.conditions) ? config.conditions : [];
+        return {
+          type: 'condition',
+          label: currentNode.label,
+          conditions,
+          fallbackEdgeId: typeof config.fallbackEdgeId === 'string' ? config.fallbackEdgeId : null
+        };
+      }
+
       return {
         type: 'action',
         actionType,
@@ -294,40 +358,203 @@ const SandboxPage = () => {
     });
   }, []);
 
+  const evaluateCondition = useCallback((condition, context) => {
+    if (!condition || typeof condition !== 'object') {
+      return false;
+    }
+
+    const type = typeof condition.type === 'string' ? condition.type : 'truthy';
+    const rawValue = resolveConditionSourceValue(condition, context);
+    let result = false;
+
+    switch (type) {
+      case 'regex': {
+        const pattern = typeof condition.pattern === 'string' ? condition.pattern : '';
+        if (!pattern) {
+          result = false;
+          break;
+        }
+        const flags = typeof condition.flags === 'string' ? condition.flags : '';
+        try {
+          const regex = new RegExp(pattern, flags);
+          result = regex.test(String(rawValue ?? ''));
+        } catch {
+          result = false;
+        }
+        break;
+      }
+      case 'empty': {
+        result = isEmptyValue(rawValue);
+        break;
+      }
+      case 'nonEmpty': {
+        result = !isEmptyValue(rawValue);
+        break;
+      }
+      case 'equals': {
+        result = rawValue === condition.value;
+        break;
+      }
+      default: {
+        result = Boolean(rawValue);
+        break;
+      }
+    }
+
+    if (condition.negate) {
+      return !result;
+    }
+    return result;
+  }, []);
+
+  const resolveActionEdge = useCallback((node, context) => {
+    if (!node || node.type !== 'action') {
+      return null;
+    }
+    const edges = Array.isArray(node.edges) ? node.edges : [];
+    const config = node.data?.config ?? {};
+    const conditions = Array.isArray(config.conditions) ? config.conditions : [];
+
+    for (let index = 0; index < conditions.length; index += 1) {
+      const condition = conditions[index];
+      const edge = edges.find((candidate) => candidate && candidate.id === condition?.edgeId);
+      if (!edge) {
+        continue;
+      }
+      if (evaluateCondition(condition, context)) {
+        return edge;
+      }
+    }
+
+    if (typeof config.fallbackEdgeId === 'string' && config.fallbackEdgeId.trim().length > 0) {
+      const fallbackEdge = edges.find((candidate) => candidate && candidate.id === config.fallbackEdgeId);
+      if (fallbackEdge) {
+        return fallbackEdge;
+      }
+    }
+
+    if (edges.length === 1) {
+      return edges[0];
+    }
+
+    return null;
+  }, [evaluateCondition]);
+
+  const buildEdgeSequence = useCallback((edge, sourceNode, startingContext) => {
+    if (!edge) {
+      return {
+        context: startingContext,
+        steps: [],
+        finalNodeId: sourceNode?.id ?? null
+      };
+    }
+
+    let context = applyContextPatch(startingContext, edge.contextPatch ?? {}, startingContext);
+    const steps = [];
+    let currentNode = getNodeById(edge.target);
+
+    steps.push({
+      edge,
+      from: sourceNode?.id ?? null,
+      to: currentNode?.id ?? null,
+      patch: describePatch(edge.contextPatch ?? {}, context)
+    });
+
+    let guard = 0;
+    while (currentNode && currentNode.type === 'action' && guard < 20) {
+      guard += 1;
+      const nextEdge = resolveActionEdge(currentNode, context);
+      if (!nextEdge) {
+        return {
+          context,
+          steps,
+          finalNodeId: currentNode.id
+        };
+      }
+
+      const targetNode = getNodeById(nextEdge.target);
+      context = applyContextPatch(context, nextEdge.contextPatch ?? {}, context);
+      steps.push({
+        edge: nextEdge,
+        from: currentNode.id,
+        to: targetNode?.id ?? null,
+        patch: describePatch(nextEdge.contextPatch ?? {}, context)
+      });
+      currentNode = targetNode;
+    }
+
+    return {
+      context,
+      steps,
+      finalNodeId: currentNode?.id ?? null
+    };
+  }, [getNodeById, resolveActionEdge]);
+
   const handleEdgeRun = useCallback((edge) => {
     if (!edge) {
       return;
     }
 
-    const nextNode = product.nodes.find((node) => node.id === edge.target);
-    if (!nextNode) {
+    const sourceNode = currentNode;
+    let sequenceResult;
+
+    setContextState((prevContext) => {
+      sequenceResult = buildEdgeSequence(edge, sourceNode, prevContext);
+      return sequenceResult.context;
+    });
+
+    if (!sequenceResult) {
       return;
     }
 
-    const nextContext = applyContextPatch(contextState, edge.contextPatch ?? {}, contextState);
-    setContextState(nextContext);
+    if (sequenceResult.finalNodeId) {
+      setCurrentNodeId(sequenceResult.finalNodeId);
+    }
 
-    const resolvedPatch = describePatch(edge.contextPatch ?? {}, nextContext);
+    if (sequenceResult.steps.length > 0) {
+      const timestampBase = Date.now();
+      const entries = sequenceResult.steps
+        .map((step, index) => ({
+          id: `${step.edge.id}-${timestampBase}-${index}`,
+          timestamp: new Date(timestampBase + index).toISOString(),
+          from: step.from,
+          to: step.to,
+          label: step.edge.label,
+          summary: step.edge.summary,
+          patch: step.patch
+        }))
+        .reverse();
 
-    setHistory((prev) => [
-      {
-        id: `${edge.id}-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        from: currentNode?.id ?? null,
-        to: nextNode.id,
-        label: edge.label,
-        summary: edge.summary,
-        patch: resolvedPatch
-      },
-      ...prev
-    ]);
+      setHistory((prev) => [...entries, ...prev]);
+    }
 
-    setCurrentNodeId(nextNode.id);
-  }, [contextState, currentNode, product]);
+    const nextInputs = sequenceResult.context?.inputs;
+    if (nextInputs && typeof nextInputs === 'object' && !Array.isArray(nextInputs)) {
+      setFormValues({ ...nextInputs });
+    }
+  }, [buildEdgeSequence, currentNode]);
 
   const handleSelectNode = useCallback((nodeId) => {
     setCurrentNodeId(nodeId);
   }, []);
+
+  const handleNodeEvent = useCallback((eventName) => {
+    if (!eventName || !currentNode) {
+      return;
+    }
+
+    const normalized = eventName.trim();
+    if (!normalized) {
+      return;
+    }
+
+    const edge = (currentNode.edges ?? []).find((candidate) => candidate && candidate.event === normalized);
+    if (!edge) {
+      return;
+    }
+
+    handleEdgeRun(edge);
+  }, [currentNode, handleEdgeRun]);
 
   const flattenedContext = useMemo(() => (
     flattenContext(contextState)
@@ -337,7 +564,7 @@ const SandboxPage = () => {
 
   const schemaEntries = Object.entries(variableSchemas).map(([name, schema]) => ({ name, schema }));
 
-  const orderStatus = getContextValue(contextState, 'data.order.status');
+  const validationStatus = getContextValue(contextState, 'data.validation.status');
 
   if (isLoaderVisible) {
     return (
@@ -544,8 +771,8 @@ const SandboxPage = () => {
             <span className="sandbox-status-value">{currentNode?.label ?? '—'}</span>
           </div>
           <div>
-            <span className="sandbox-status-label">Статус заказа</span>
-            <span className="sandbox-status-value">{formatValue(orderStatus)}</span>
+            <span className="sandbox-status-label">Статус проверки</span>
+            <span className="sandbox-status-value">{formatValue(validationStatus)}</span>
           </div>
         </div>
 
@@ -556,6 +783,7 @@ const SandboxPage = () => {
               context={contextState}
               formValues={formValues}
               onInputChange={handleInputChange}
+              onEvent={handleNodeEvent}
             />
           )}
 
@@ -574,6 +802,40 @@ const SandboxPage = () => {
               </header>
               <div className="sandbox-api-result">
                 <pre>{formatJson(nodePreview.resultValue)}</pre>
+              </div>
+            </div>
+          )}
+
+          {nodePreview.type === 'condition' && (
+            <div className="sandbox-card">
+              <header className="sandbox-card-header">
+                <GitBranch size={18} />
+                <div>
+                  <h2>{nodePreview.label || 'Условный переход'}</h2>
+                  <p>Технический узел: выбор ветки по условиям</p>
+                </div>
+              </header>
+              <div className="sandbox-transition-body">
+                {nodePreview.conditions.length === 0 ? (
+                  <div className="sandbox-empty">Условия не настроены</div>
+                ) : (
+                  <ul className="sandbox-transition-patch">
+                    {nodePreview.conditions.map((condition, index) => (
+                      <li key={condition?.id || condition?.edgeId || `condition-${index}`}>
+                        <span className="sandbox-transition-key">
+                          {condition?.description || condition?.type || `Условие ${index + 1}`}
+                        </span>
+                        <ArrowRight size={12} />
+                        <span className="sandbox-transition-value">{condition?.edgeId || '—'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {nodePreview.fallbackEdgeId && (
+                  <p className="sandbox-history-summary">
+                    Fallback переход: {nodePreview.fallbackEdgeId}
+                  </p>
+                )}
               </div>
             </div>
           )}

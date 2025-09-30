@@ -3,7 +3,12 @@ import cors from 'cors';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
-import { applyContextPatch } from '../../src/pages/Sandbox/utils/bindings.js';
+import {
+  applyContextPatch,
+  resolveBindingValue,
+  isBindingValue,
+  getContextValue
+} from '../../src/pages/Sandbox/utils/bindings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,20 +62,109 @@ const EDGE_REGISTRY = new Map();
   });
 });
 
-const DEFAULT_INPUTS = { email: '', promo: '' };
+const DEFAULT_INPUTS = { email: '' };
 
 const EVENT_RULES = {
-  pay: { edgeId: 'edge-submit-success', targetNode: 'success' },
-  cancel: { edgeId: 'edge-submit-cancel', targetNode: 'cancelled' },
-  resume: { edgeId: 'edge-cancelled-retry', targetNode: 'checkout' },
-  restart: { edgeId: 'edge-success-new-order', targetNode: 'checkout', keepInputs: false }
+  checkemail: { sourceNode: 'email-entry', edgeId: 'edge-email-submit', keepInputs: true },
+  retryfromsuccess: { sourceNode: 'email-valid', edgeId: 'edge-valid-retry', keepInputs: false },
+  retryfromerror: { sourceNode: 'email-invalid', edgeId: 'edge-invalid-retry', keepInputs: false }
 };
 
-const BUTTON_EVENT_INJECTIONS = {
-  'screen-checkout': {
-    'button-3yqrdr-1758927807107': 'pay',
-    'button-krym27-1758927807107': 'cancel'
+const BUTTON_EVENT_INJECTIONS = {};
+
+const FETCH_TIMEOUT_MS = Number(process.env.SANDBOX_FETCH_TIMEOUT ?? 2000);
+const PREFETCH_CACHE_TTL = Number(process.env.SANDBOX_PREFETCH_TTL ?? 60000);
+const REMOTE_PREFETCH_URL = process.env.SANDBOX_PREFETCH_URL ?? 'https://dummyjson.com/quotes/random';
+const REMOTE_SUCCESS_URL = process.env.SANDBOX_SUCCESS_URL ?? 'https://dummyjson.com/todos/random';
+const DISABLE_REMOTE_FETCH = process.env.SANDBOX_FETCH_DISABLED === '1';
+const SUCCESS_NODE_ID = 'email-valid';
+
+const PREFETCH_FALLBACK = {
+  title: 'Совет перед проверкой',
+  description: 'Убедитесь, что адрес содержит @ и домен, прежде чем продолжить.'
+};
+
+let cachedPrefetchPayload = null;
+let cachedPrefetchFetchedAt = 0;
+
+const fetchJsonWithTimeout = async (url) => {
+  if (DISABLE_REMOTE_FETCH || typeof fetch !== 'function') {
+    return null;
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn('[sandbox-js] remote fetch failed', url, error?.message ?? error);
+    }
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const mapPrefetchResponse = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const quote = typeof payload.quote === 'string' ? payload.quote.trim() : '';
+  const author = typeof payload.author === 'string' ? payload.author.trim() : '';
+  if (!quote) {
+    return null;
+  }
+  const title = author ? `Совет от ${author}` : 'Совет от внешнего сервиса';
+  return { title, description: quote };
+};
+
+const mapSuccessResponse = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const todo = typeof payload.todo === 'string' ? payload.todo.trim() : '';
+  if (!todo) {
+    return null;
+  }
+  const completed = payload.completed === true;
+  const title = completed ? 'Совет успешно выполнен' : 'Рекомендация для следующего шага';
+  return {
+    title,
+    description: todo
+  };
+};
+
+const getPrefetchData = async () => {
+  const now = Date.now();
+  if (cachedPrefetchPayload && (now - cachedPrefetchFetchedAt) < PREFETCH_CACHE_TTL) {
+    return cachedPrefetchPayload;
+  }
+
+  const remotePayload = await fetchJsonWithTimeout(REMOTE_PREFETCH_URL);
+  const mapped = mapPrefetchResponse(remotePayload) ?? PREFETCH_FALLBACK;
+  cachedPrefetchPayload = mapped;
+  cachedPrefetchFetchedAt = now;
+  return mapped;
+};
+
+const getSuccessData = async () => {
+  const remotePayload = await fetchJsonWithTimeout(REMOTE_SUCCESS_URL);
+  return mapSuccessResponse(remotePayload) ?? {
+    title: 'Совет по дальнейшим шагам',
+    description: 'Используйте подтверждённый email, чтобы отправить приветственное письмо или запросить дополнительную информацию.'
+  };
+};
+
+const mergeExternalData = (context, path, payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return context;
+  }
+  return applyContextPatch(context, { [path]: payload }, context);
 };
 
 const safeJsonStringify = (value) => {
@@ -96,6 +190,186 @@ const cleanupObject = (value) => {
   return Object.keys(value).length > 0 ? value : undefined;
 };
 
+const resolveConditionSourceValue = (condition, context) => {
+  if (!condition || typeof condition !== 'object') {
+    return undefined;
+  }
+
+  const { source, path, fallback, value } = condition;
+
+  if (source !== undefined) {
+    if (isBindingValue(source)) {
+      return resolveBindingValue(source, context, fallback);
+    }
+    if (typeof source === 'string') {
+      if (source.startsWith('${') && source.endsWith('}')) {
+        return resolveBindingValue({ reference: source, value: fallback }, context, fallback);
+      }
+      return source;
+    }
+    return source;
+  }
+
+  if (typeof path === 'string' && path.trim().length > 0) {
+    return getContextValue(context, path.trim());
+  }
+
+  return value;
+};
+
+const isEmptyValue = (candidate) => {
+  if (candidate === null || candidate === undefined) {
+    return true;
+  }
+  if (typeof candidate === 'string') {
+    return candidate.trim().length === 0;
+  }
+  if (Array.isArray(candidate)) {
+    return candidate.length === 0;
+  }
+  if (typeof candidate === 'object') {
+    return Object.keys(candidate).length === 0;
+  }
+  return false;
+};
+
+const evaluateCondition = (condition, context) => {
+  if (!condition || typeof condition !== 'object') {
+    return false;
+  }
+
+  const type = typeof condition.type === 'string' ? condition.type : 'truthy';
+  const rawValue = resolveConditionSourceValue(condition, context);
+  let result = false;
+
+  switch (type) {
+    case 'regex': {
+      const pattern = typeof condition.pattern === 'string' ? condition.pattern : '';
+      if (!pattern) {
+        result = false;
+        break;
+      }
+      const flags = typeof condition.flags === 'string' ? condition.flags : '';
+      try {
+        const regex = new RegExp(pattern, flags);
+        result = regex.test(String(rawValue ?? ''));
+      } catch {
+        result = false;
+      }
+      break;
+    }
+    case 'empty': {
+      result = isEmptyValue(rawValue);
+      break;
+    }
+    case 'nonEmpty': {
+      result = !isEmptyValue(rawValue);
+      break;
+    }
+    case 'equals': {
+      result = rawValue === condition.value;
+      break;
+    }
+    default: {
+      result = Boolean(rawValue);
+      break;
+    }
+  }
+
+  if (condition.negate) {
+    return !result;
+  }
+  return result;
+};
+
+const resolveConditionEdge = (node, context) => {
+  if (!node || node.type !== 'action') {
+    return null;
+  }
+
+  const edges = Array.isArray(node.edges) ? node.edges : [];
+  const config = node.data?.config ?? {};
+  const conditions = Array.isArray(config.conditions) ? config.conditions : [];
+
+  for (let index = 0; index < conditions.length; index += 1) {
+    const condition = conditions[index];
+    const targetEdge = edges.find((edge) => edge && edge.id === condition?.edgeId);
+    if (!targetEdge) {
+      continue;
+    }
+    if (evaluateCondition(condition, context)) {
+      return targetEdge;
+    }
+  }
+
+  if (typeof config.fallbackEdgeId === 'string' && config.fallbackEdgeId.trim()) {
+    const fallbackEdge = edges.find((edge) => edge && edge.id === config.fallbackEdgeId);
+    if (fallbackEdge) {
+      return fallbackEdge;
+    }
+  }
+
+  if (edges.length === 1) {
+    return edges[0];
+  }
+
+  return null;
+};
+
+const runEdgeSequence = (edgeId, sourceNodeId, startingContext) => {
+  if (!edgeId) {
+    return { context: startingContext, finalNodeId: sourceNodeId };
+  }
+
+  let context = startingContext;
+  let currentEdgeId = edgeId;
+  let currentSourceNodeId = sourceNodeId;
+  let guard = 0;
+  let lastTargetNodeId = sourceNodeId;
+
+  while (currentEdgeId) {
+    const edge = EDGE_REGISTRY.get(currentEdgeId);
+    if (!edge) {
+      throw new HttpError(500, `Edge '${currentEdgeId}' is not defined in sandbox flow`);
+    }
+    if (edge.source && edge.source !== currentSourceNodeId) {
+      throw new HttpError(500, `Edge '${currentEdgeId}' is not connected to node '${currentSourceNodeId}'`);
+    }
+
+    context = applyContextPatch(context, edge.contextPatch ?? {}, context);
+    lastTargetNodeId = edge.target ?? lastTargetNodeId;
+
+    const targetNode = edge.target ? NODE_REGISTRY.get(edge.target) : undefined;
+    if (!targetNode || targetNode.type !== 'action') {
+      return {
+        context,
+        finalNodeId: targetNode?.id ?? lastTargetNodeId
+      };
+    }
+
+    guard += 1;
+    if (guard > 20) {
+      throw new HttpError(500, `Action node '${targetNode.id}' produced too many transitions`);
+    }
+
+    const nextEdge = resolveConditionEdge(targetNode, context);
+    if (!nextEdge) {
+      return {
+        context,
+        finalNodeId: targetNode.id
+      };
+    }
+
+    currentEdgeId = nextEdge.id;
+    currentSourceNodeId = targetNode.id;
+  }
+
+  return {
+    context,
+    finalNodeId: lastTargetNodeId ?? currentSourceNodeId
+  };
+};
+
 const logExchange = (label, req, { status, body, error } = {}) => {
   const payload = {
     method: req.method,
@@ -116,6 +390,12 @@ const logExchange = (label, req, { status, body, error } = {}) => {
 };
 
 const cloneBaseContext = () => deepClone(BASE_CONTEXT);
+
+const buildBaseContextWithPrefetch = async () => {
+  const base = cloneBaseContext();
+  const prefetchPayload = await getPrefetchData();
+  return mergeExternalData(base, 'data.external.prefetch', prefetchPayload);
+};
 
 const stateOverridesForNode = (nodeId) => {
   const node = NODE_REGISTRY.get(nodeId);
@@ -213,57 +493,10 @@ const getScreenPayload = (screenId) => {
 
 const buildDynamicPatch = (event, inputs) => {
   const patch = {};
-  const email = inputs.email?.trim();
-  const promo = inputs.promo?.trim();
-
-  if (event === 'pay') {
-    const messageParts = [];
-    if (email) {
-      patch['data.user.email'] = email;
-      messageParts.push(`чек отправлен на ${email}`);
-    } else {
-      messageParts.push('чек отправлен клиенту');
-    }
-    if (promo) {
-      messageParts.push(`применён промокод ${promo}`);
-    }
-    let message = 'Платёж завершён';
-    if (messageParts.length > 0) {
-      message = `${message}, ${messageParts.join(', ')}`;
-    }
-    patch['ui.notifications.lastAction'] = message;
-  } else if (event === 'cancel') {
-    const parts = [];
-    if (email) {
-      patch['data.user.email'] = email;
-      parts.push(`email клиента: ${email}`);
-    }
-    if (promo) {
-      parts.push(`промокод: ${promo}`);
-    }
-    const base = 'Заказ перенесён в отменённые';
-    patch['ui.notifications.lastAction'] = parts.length > 0 ? `${base}. ${parts.join(' ')}` : base;
-  } else if (event === 'resume' || event === 'restart') {
-    if (email) {
-      patch['data.user.email'] = email;
-    }
+  if (typeof inputs.email === 'string') {
+    patch['inputs.email'] = inputs.email.trim();
   }
-
   return patch;
-};
-
-const buildPatchForEvent = (event, inputs) => {
-  const rule = EVENT_RULES[event];
-  if (!rule) {
-    throw new HttpError(404, `Unknown event '${event}'`);
-  }
-  const edge = EDGE_REGISTRY.get(rule.edgeId);
-  if (!edge) {
-    throw new HttpError(500, `Edge '${rule.edgeId}' is not defined in sandbox flow`);
-  }
-  const patch = deepClone(edge.contextPatch ?? {});
-  const dynamicPatch = buildDynamicPatch(event, inputs);
-  return { ...patch, ...dynamicPatch };
 };
 
 const applyPatchToContext = (baseContext, patch) => {
@@ -275,45 +508,50 @@ const applyPatchToContext = (baseContext, patch) => {
 
 const makeStateSnapshot = (context, overrides, inputs) => {
   const ui = (context && typeof context === 'object') ? context.ui ?? {} : {};
-  const data = (context && typeof context === 'object') ? context.data ?? {} : {};
-  const order = (data && typeof data === 'object') ? data.order ?? {} : {};
   const notifications = (ui && typeof ui === 'object') ? ui.notifications ?? {} : {};
+  const data = (context && typeof context === 'object') ? context.data ?? {} : {};
+  const validation = (data && typeof data === 'object') ? data.validation ?? {} : {};
 
-  let cartItems = [];
-  const cart = data.cart;
-  if (cart && typeof cart === 'object' && Array.isArray(cart.items)) {
-    cartItems = cart.items
-      .filter((item) => item && typeof item === 'object' && typeof item.title === 'string')
-      .map((item) => item.title);
-  }
+  const status = overrides?.status
+    ?? (typeof validation.status === 'string' ? validation.status : 'idle');
 
-  const details = [];
-  const overrideMessage = overrides?.lastMessage;
-  const notificationMessage = notifications.lastAction;
-  const message = overrideMessage ?? (typeof notificationMessage === 'string' ? notificationMessage : '');
-  if (message) {
-    details.push(message);
-  }
+  const validationMessage = typeof validation.message === 'string' ? validation.message : undefined;
+  const notificationMessage = typeof notifications.lastAction === 'string' ? notifications.lastAction : undefined;
+  const message = overrides?.message ?? validationMessage ?? notificationMessage ?? '';
 
-  const email = inputs.email?.trim();
-  const promo = inputs.promo?.trim();
-  if (email) {
-    details.push(`Email клиента: ${email}`);
-  }
-  if (promo) {
-    details.push(`Промокод: ${promo}`);
+  const emailFromInputs = typeof inputs?.email === 'string' ? inputs.email.trim() : '';
+  const emailFromContext = getContextValue(context, 'data.user.email');
+  const email = overrides?.email
+    ?? (emailFromInputs || (typeof emailFromContext === 'string' ? emailFromContext : ''));
+
+  const details = Array.isArray(overrides?.details) ? overrides.details : [];
+  if (details.length === 0) {
+    const computed = [];
+    if (message) {
+      computed.push(message);
+    }
+    if (email) {
+      computed.push(`Email: ${email}`);
+    }
+    return {
+      title: overrides?.title
+        ?? (ui?.screen && typeof ui.screen === 'object' && typeof ui.screen.title === 'string' ? ui.screen.title : 'Проверка email'),
+      status,
+      message,
+      email,
+      lastAction: typeof notifications.lastAction === 'string' ? notifications.lastAction : '',
+      details: computed
+    };
   }
 
   return {
     title: overrides?.title
-      ?? (ui?.screen && typeof ui.screen === 'object' && typeof ui.screen.title === 'string' ? ui.screen.title : 'E-commerce Dashboard'),
-    status: overrides?.status ?? (typeof order.status === 'string' ? order.status : 'draft'),
-    orderNumber: overrides?.orderNumber ?? order.number ?? 'ORD-1024',
-    total: order.total,
-    totalFormatted: order.totalFormatted,
-    lastMessage: message,
-    details: overrides?.details ?? details,
-    items: overrides?.items ?? cartItems
+      ?? (ui?.screen && typeof ui.screen === 'object' && typeof ui.screen.title === 'string' ? ui.screen.title : 'Проверка email'),
+    status,
+    message,
+    email,
+    lastAction: typeof notifications.lastAction === 'string' ? notifications.lastAction : '',
+    details
   };
 };
 
@@ -323,6 +561,9 @@ const buildApiContext = (coreContext, inputs, stateOverrides) => {
     data: deepClone(coreContext.data ?? {}),
     inputs: { ...DEFAULT_INPUTS, ...(inputs ?? {}) }
   };
+  if (typeof payload.inputs.email === 'string') {
+    payload.inputs.email = payload.inputs.email.trim();
+  }
   payload.state = makeStateSnapshot(payload, stateOverrides ?? {}, payload.inputs);
   return payload;
 };
@@ -351,14 +592,14 @@ const extractFormValues = (query) => {
   return result;
 };
 
-const buildStartResponse = () => {
-  const core = cloneBaseContext();
-  const context = buildApiContext(core, DEFAULT_INPUTS, stateOverridesForNode('checkout'));
-  const screenId = resolveScreenId('checkout');
+const buildStartResponse = async () => {
+  const core = await buildBaseContextWithPrefetch();
+  const context = buildApiContext(core, DEFAULT_INPUTS, stateOverridesForNode('email-entry'));
+  const screenId = resolveScreenId('email-entry');
   return makeScreenResponse(screenId, context);
 };
 
-const handleEvent = (eventName, query) => {
+const handleEvent = async (eventName, query) => {
   if (!eventName) {
     throw new HttpError(400, "Parameter 'event' is required");
   }
@@ -370,26 +611,31 @@ const handleEvent = (eventName, query) => {
 
   const formValues = extractFormValues(query);
   const inputs = { ...DEFAULT_INPUTS, ...formValues };
-  const patch = buildPatchForEvent(normalized, inputs);
+  if (typeof inputs.email === 'string') {
+    inputs.email = inputs.email.trim();
+  }
 
-  const baseContext = cloneBaseContext();
-  const patchedContext = applyPatchToContext(baseContext, patch);
+  const dynamicPatch = buildDynamicPatch(normalized, inputs);
+  const baseContext = await buildBaseContextWithPrefetch();
+  const contextWithInputs = applyPatchToContext(baseContext, dynamicPatch);
 
-  const email = inputs.email?.trim();
-  if (email) {
-    if (!patchedContext.data || typeof patchedContext.data !== 'object') {
-      patchedContext.data = {};
-    }
-    if (!patchedContext.data.user || typeof patchedContext.data.user !== 'object') {
-      patchedContext.data.user = {};
-    }
-    patchedContext.data.user.email = email;
+  const edgeResult = runEdgeSequence(rule.edgeId, rule.sourceNode, contextWithInputs);
+  const finalNodeId = edgeResult.finalNodeId;
+  let contextAfterFlow = edgeResult.context;
+
+  if (finalNodeId === SUCCESS_NODE_ID) {
+    const successPayload = await getSuccessData();
+    contextAfterFlow = mergeExternalData(contextAfterFlow, 'data.external.success', successPayload);
+  }
+
+  if (!finalNodeId) {
+    throw new HttpError(500, `Event '${eventName}' did not resolve to a target node`);
   }
 
   const keepInputs = rule.keepInputs ?? true;
   const inputsForContext = keepInputs ? inputs : deepClone(DEFAULT_INPUTS);
-  const screenId = resolveScreenId(rule.targetNode);
-  const context = buildApiContext(patchedContext, inputsForContext, stateOverridesForNode(rule.targetNode));
+  const screenId = resolveScreenId(finalNodeId);
+  const context = buildApiContext(contextAfterFlow, inputsForContext, stateOverridesForNode(finalNodeId));
   return makeScreenResponse(screenId, context);
 };
 
@@ -406,9 +652,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.get('/api/start/', (req, res) => {
+app.get('/api/start/', async (req, res) => {
   try {
-    const payload = buildStartResponse();
+    const payload = await buildStartResponse();
     logExchange('GET /api/start/', req, { status: 200, body: payload });
     res.json(payload);
   } catch (error) {
@@ -419,10 +665,10 @@ app.get('/api/start/', (req, res) => {
   }
 });
 
-app.get('/api/action', (req, res) => {
+app.get('/api/action', async (req, res) => {
   const eventParam = typeof req.query.event === 'string' ? req.query.event : Array.isArray(req.query.event) ? req.query.event[0] : undefined;
   try {
-    const payload = handleEvent(eventParam, req.query);
+    const payload = await handleEvent(eventParam, req.query);
     logExchange('GET /api/action', req, { status: 200, body: payload });
     res.json(payload);
   } catch (error) {

@@ -7,6 +7,7 @@ import ScreenEditor from './pages/ScreenEditor/ScreenEditor';
 import ScreenBuilder from './pages/ScreenBuilder/ScreenBuilder';
 import SandboxPage from './pages/Sandbox/SandboxPage';
 import PreviewPage from './pages/Preview/PreviewPage';
+import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 
@@ -23,6 +24,9 @@ function App() {
 
               {/* Sandbox */}
               <Route path="/sandbox" element={<SandboxPage />} />
+
+              {/* Analytics */}
+              <Route path="/analytics" element={<AnalyticsDashboard />} />
 
               {/* Preview */}
               <Route path="/preview" element={<PreviewPage />} />

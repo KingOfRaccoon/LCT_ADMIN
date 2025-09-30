@@ -8,7 +8,8 @@ import {
   Activity,
   ChevronRight,
   FlaskConical,
-  PlayCircle
+  PlayCircle,
+  BarChart3
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
 import './Sidebar.css';
@@ -42,6 +43,12 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
           icon: FlaskConical,
           path: '/sandbox',
           active: currentPath === '/sandbox'
+        },
+        {
+          label: 'Analytics',
+          icon: BarChart3,
+          path: '/analytics',
+          active: currentPath === '/analytics'
         },
         {
           label: 'Preview',

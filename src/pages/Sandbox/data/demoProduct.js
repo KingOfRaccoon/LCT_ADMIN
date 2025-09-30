@@ -1,7 +1,9 @@
-import ecommerceDashboard from './ecommerceDashboard.json';
+// import ecommerceDashboard from './ecommerceDashboard.json';
+import avitoDemo from './avitoDemo.json';
 
-export const demoProduct = ecommerceDashboard;
-export default ecommerceDashboard;
+// Switch between presets: ecommerceDashboard | avitoDemo
+export const demoProduct = avitoDemo;
+export default avitoDemo;
 
 /* Legacy inline dataset retained for reference.
 const legacyEcommerceDashboard = {

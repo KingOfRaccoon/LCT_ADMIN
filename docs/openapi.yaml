@@ -1,0 +1,2110 @@
+openapi: 3.0.3
+info:
+  title: BDUI Admin API
+  description: |
+    REST API для взаимодействия админ-панели BDUI с backend сервером для управления продуктами, экранами, переменными и аналитикой.
+    
+    ## Аутентификация
+    API использует JWT Bearer токены. Получите токен через `/auth/login` и передавайте в заголовке:
+    ```
+    Authorization: Bearer <your_token>
+    ```
+    
+    ## Rate Limiting
+    - Free Tier: 100 requests/minute
+    - Pro Tier: 1000 requests/minute
+    - Enterprise: Unlimited
+    
+    ## Поддержка
+    - Документация: https://docs.bdui.com/api
+    - Support: api-support@bdui.com
+    - Discord: https://discord.gg/bdui
+  version: 1.0.0
+  contact:
+    name: BDUI API Support
+    email: api@bdui.com
+    url: https://docs.bdui.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.bdui.com/v1
+    description: Production server
+  - url: https://sandbox-api.bdui.com/v1
+    description: Sandbox server (testing)
+  - url: http://localhost:5050/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: Аутентификация и управление токенами
+  - name: Products
+    description: Управление продуктами
+  - name: Screens
+    description: Управление экранами продуктов
+  - name: Variables
+    description: Управление переменными контекста
+  - name: Graph
+    description: Граф узлов и рёбер
+  - name: Analytics
+    description: Аналитические данные
+  - name: Assets
+    description: Загрузка и управление файлами
+  - name: Webhooks
+    description: Webhooks для событий
+
+paths:
+  # ==================== Authentication ====================
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Аутентификация пользователя
+      description: Получение JWT токена для доступа к API
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Обновление токена
+      description: Получение нового JWT токена через refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: refresh_token_here
+      responses:
+        '200':
+          description: Новый токен успешно получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+                    example: 3600
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Выход из системы
+      description: Инвалидация текущего токена
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Токен успешно инвалидирован
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== Products ====================
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Получить список продуктов
+      description: Получение списка всех продуктов с фильтрацией и пагинацией
+      operationId: listProducts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Номер страницы
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Количество элементов на странице
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          description: Фильтр по статусу
+          schema:
+            type: string
+            enum: [draft, active, archived]
+        - name: search
+          in: query
+          description: Поиск по названию или описанию
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          description: Поле для сортировки
+          schema:
+            type: string
+            enum: [name, createdAt, updatedAt]
+            default: createdAt
+        - name: sortOrder
+          in: query
+          description: Порядок сортировки
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Список продуктов успешно получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+    post:
+      tags:
+        - Products
+      summary: Создать новый продукт
+      description: Создание нового продукта с базовой конфигурацией
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Продукт успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Получить продукт по ID
+      description: Получение полной конфигурации продукта
+      operationId: getProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Продукт успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - Products
+      summary: Обновить продукт (полная замена)
+      description: Полная замена конфигурации продукта
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '200':
+          description: Продукт успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductUpdated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags:
+        - Products
+      summary: Частичное обновление продукта
+      description: Обновление отдельных полей продукта
+      operationId: patchProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: New Product Name
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [draft, active, archived]
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Продукт успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductUpdated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Products
+      summary: Удалить продукт
+      description: Удаление продукта (soft delete или permanent)
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: permanent
+          in: query
+          description: Удалить навсегда или архивировать
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Продукт успешно удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /products/{id}/duplicate:
+    post:
+      tags:
+        - Products
+      summary: Дублировать продукт
+      description: Создание копии существующего продукта
+      operationId: duplicateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - slug
+              properties:
+                name:
+                  type: string
+                  example: Copy of Avito Cart Demo
+                slug:
+                  type: string
+                  example: avito-cart-demo-copy
+                includeAnalytics:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Копия продукта создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCreated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{id}/publish:
+    post:
+      tags:
+        - Products
+      summary: Опубликовать продукт
+      description: Публикация продукта (draft → active)
+      operationId: publishProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  type: string
+                  example: 1.0.0
+                releaseNotes:
+                  type: string
+                  example: Initial release with cart flow
+      responses:
+        '200':
+          description: Продукт успешно опубликован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [active]
+                  version:
+                    type: string
+                  publishedAt:
+                    type: string
+                    format: date-time
+                  deploymentUrl:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{id}/versions:
+    get:
+      tags:
+        - Products
+      summary: Получить историю версий
+      description: Получение списка всех версий продукта
+      operationId: getProductVersions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: История версий получена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductVersion'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{id}/restore:
+    post:
+      tags:
+        - Products
+      summary: Восстановить версию продукта
+      description: Восстановление продукта из определённой версии
+      operationId: restoreProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  type: string
+                  example: 1.0.0
+                createBackup:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Версия успешно восстановлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  version:
+                    type: string
+                  restoredAt:
+                    type: string
+                    format: date-time
+                  backupVersion:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Screens ====================
+  /products/{productId}/screens:
+    get:
+      tags:
+        - Screens
+      summary: Получить список экранов
+      description: Получение всех экранов продукта
+      operationId: listScreens
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Список экранов получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScreenSummary'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Screens
+      summary: Создать новый экран
+      description: Создание нового экрана в продукте
+      operationId: createScreen
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenCreate'
+      responses:
+        '201':
+          description: Экран успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /products/{productId}/screens/{screenId}:
+    get:
+      tags:
+        - Screens
+      summary: Получить экран по ID
+      description: Получение полной конфигурации экрана
+      operationId: getScreen
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ScreenId'
+      responses:
+        '200':
+          description: Экран успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Screen'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Screens
+      summary: Обновить экран
+      description: Полная замена конфигурации экрана
+      operationId: updateScreen
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ScreenId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenUpdate'
+      responses:
+        '200':
+          description: Экран успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenUpdated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Screens
+      summary: Удалить экран
+      description: Удаление экрана из продукта
+      operationId: deleteScreen
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ScreenId'
+      responses:
+        '204':
+          description: Экран успешно удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ==================== Variables ====================
+  /products/{productId}/variables:
+    get:
+      tags:
+        - Variables
+      summary: Получить список переменных
+      description: Получение всех переменных продукта
+      operationId: listVariables
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Список переменных получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Variable'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags:
+        - Variables
+      summary: Создать новую переменную
+      description: Создание новой переменной в контексте продукта
+      operationId: createVariable
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariableCreate'
+      responses:
+        '201':
+          description: Переменная успешно создана
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /products/{productId}/variables/{variablePath}:
+    put:
+      tags:
+        - Variables
+      summary: Обновить переменную
+      description: Обновление схемы и значения переменной
+      operationId: updateVariable
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: variablePath
+          in: path
+          required: true
+          description: Путь переменной (URL-encoded, например cart%2Eitems)
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariableUpdate'
+      responses:
+        '200':
+          description: Переменная успешно обновлена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Variables
+      summary: Удалить переменную
+      description: Удаление переменной из контекста
+      operationId: deleteVariable
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: variablePath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Переменная успешно удалена
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ==================== Graph ====================
+  /products/{productId}/graph:
+    get:
+      tags:
+        - Graph
+      summary: Получить граф узлов и рёбер
+      description: Получение графа для визуализации в React Flow
+      operationId: getGraph
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Граф успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Graph'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{productId}/nodes:
+    post:
+      tags:
+        - Graph
+      summary: Создать новый узел
+      description: Создание нового узла в графе продукта
+      operationId: createNode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeCreate'
+      responses:
+        '201':
+          description: Узел успешно создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /products/{productId}/nodes/{nodeId}:
+    put:
+      tags:
+        - Graph
+      summary: Обновить узел
+      description: Обновление конфигурации узла
+      operationId: updateNode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeUpdate'
+      responses:
+        '200':
+          description: Узел успешно обновлён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Graph
+      summary: Удалить узел
+      description: Удаление узла из графа
+      operationId: deleteNode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Узел успешно удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products/{productId}/edges:
+    post:
+      tags:
+        - Graph
+      summary: Создать новое ребро
+      description: Создание нового ребра между узлами
+      operationId: createEdge
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdgeCreate'
+      responses:
+        '201':
+          description: Ребро успешно создано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /products/{productId}/edges/{edgeId}:
+    delete:
+      tags:
+        - Graph
+      summary: Удалить ребро
+      description: Удаление ребра из графа
+      operationId: deleteEdge
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: edgeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Ребро успешно удалено
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Analytics ====================
+  /analytics/events:
+    post:
+      tags:
+        - Analytics
+      summary: Отправить батч событий
+      description: Отправка батча аналитических событий
+      operationId: sendAnalyticsEvents
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyticsEventBatch'
+      responses:
+        '202':
+          description: События приняты на обработку
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /analytics/products/{productId}:
+    get:
+      tags:
+        - Analytics
+      summary: Получить аналитику по продукту
+      description: Получение метрик и статистики по продукту
+      operationId: getProductAnalytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: metrics
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [screenViews, clicks, avgDuration, bounceRate]
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+      responses:
+        '200':
+          description: Аналитика успешно получена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAnalytics'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/products/{productId}/funnels:
+    get:
+      tags:
+        - Analytics
+      summary: Получить данные воронок
+      description: Получение funnel analysis для продукта
+      operationId: getProductFunnels
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Данные воронок получены
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  funnels:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Funnel'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /analytics/products/{productId}/heatmaps/{screenId}:
+    get:
+      tags:
+        - Analytics
+      summary: Получить heatmap данные
+      description: Получение heatmap данных для экрана
+      operationId: getScreenHeatmap
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+        - $ref: '#/components/parameters/ScreenId'
+      responses:
+        '200':
+          description: Heatmap данные получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Heatmap'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Assets ====================
+  /assets/upload:
+    post:
+      tags:
+        - Assets
+      summary: Загрузить файл
+      description: Загрузка изображения или файла
+      operationId: uploadAsset
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - productId
+              properties:
+                file:
+                  type: string
+                  format: binary
+                productId:
+                  type: string
+                folder:
+                  type: string
+                  default: images
+      responses:
+        '201':
+          description: Файл успешно загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /assets/{id}:
+    get:
+      tags:
+        - Assets
+      summary: Получить метаданные ассета
+      description: Получение информации о загруженном файле
+      operationId: getAsset
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Метаданные ассета получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Assets
+      summary: Удалить ассет
+      description: Удаление файла
+      operationId: deleteAsset
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Ассет успешно удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Webhooks ====================
+  /webhooks:
+    post:
+      tags:
+        - Webhooks
+      summary: Создать webhook
+      description: Создание webhook для получения событий
+      operationId: createWebhook
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookCreate'
+      responses:
+        '201':
+          description: Webhook успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+# ==================== Components ====================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      description: ID продукта
+      schema:
+        type: string
+        example: prod-123
+
+    ScreenId:
+      name: screenId
+      in: path
+      required: true
+      description: ID экрана
+      schema:
+        type: string
+        example: screen-loading
+
+  schemas:
+    # ========== Authentication ==========
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT токен
+        refreshToken:
+          type: string
+          description: Refresh токен
+        expiresIn:
+          type: integer
+          description: Время жизни токена в секундах
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+        permissions:
+          type: array
+          items:
+            type: string
+
+    # ========== Products ==========
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+        version:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: '#/components/schemas/UserInfo'
+        stats:
+          type: object
+          properties:
+            screens:
+              type: integer
+            nodes:
+              type: integer
+            variables:
+              type: integer
+
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          properties:
+            variableSchemas:
+              type: object
+              additionalProperties: true
+            initialContext:
+              type: object
+              additionalProperties: true
+            nodes:
+              type: array
+              items:
+                $ref: '#/components/schemas/Node'
+            screens:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/Screen'
+            metadata:
+              type: object
+              properties:
+                tags:
+                  type: array
+                  items:
+                    type: string
+                category:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [public, private]
+
+    ProductCreate:
+      type: object
+      required:
+        - name
+        - slug
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+          default: draft
+        version:
+          type: string
+          default: 1.0.0
+        variableSchemas:
+          type: object
+        initialContext:
+          type: object
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        screens:
+          type: object
+        metadata:
+          type: object
+
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+        version:
+          type: string
+        variableSchemas:
+          type: object
+        initialContext:
+          type: object
+        nodes:
+          type: array
+        screens:
+          type: object
+        metadata:
+          type: object
+
+    ProductCreated:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: '#/components/schemas/UserInfo'
+
+    ProductUpdated:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+
+    ProductVersion:
+      type: object
+      properties:
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: '#/components/schemas/UserInfo'
+        releaseNotes:
+          type: string
+        changesSummary:
+          type: object
+          properties:
+            screens:
+              type: object
+              properties:
+                added:
+                  type: integer
+                modified:
+                  type: integer
+                deleted:
+                  type: integer
+            nodes:
+              type: object
+              properties:
+                added:
+                  type: integer
+                modified:
+                  type: integer
+                deleted:
+                  type: integer
+
+    # ========== Screens ==========
+    ScreenSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          default: Screen
+        thumbnail:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        stats:
+          type: object
+          properties:
+            components:
+              type: integer
+            sections:
+              type: integer
+
+    Screen:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          default: Screen
+        name:
+          type: string
+        style:
+          type: object
+          additionalProperties: true
+        sections:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Section'
+
+    Section:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          default: Section
+        properties:
+          type: object
+          additionalProperties: true
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/Component'
+
+    Component:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        properties:
+          type: object
+          additionalProperties: true
+        style:
+          type: object
+          additionalProperties: true
+        events:
+          type: object
+          additionalProperties: true
+
+    ScreenCreate:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          default: Screen
+        sections:
+          type: object
+
+    ScreenUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        sections:
+          type: object
+
+    ScreenCreated:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ScreenUpdated:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ========== Variables ==========
+    Variable:
+      type: object
+      properties:
+        path:
+          type: string
+          example: cart.items
+        schema:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [string, number, boolean, array, object]
+            items:
+              type: string
+            properties:
+              type: object
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    VariableCreate:
+      type: object
+      required:
+        - path
+        - schema
+      properties:
+        path:
+          type: string
+        schema:
+          type: object
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    VariableUpdate:
+      type: object
+      properties:
+        schema:
+          type: object
+        defaultValue:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        description:
+          type: string
+
+    # ========== Graph ==========
+    Graph:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactFlowNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactFlowEdge'
+
+    ReactFlowNode:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        data:
+          type: object
+          properties:
+            label:
+              type: string
+            screenId:
+              type: string
+            start:
+              type: boolean
+
+    ReactFlowEdge:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        type:
+          type: string
+          default: smoothstep
+        label:
+          type: string
+        data:
+          type: object
+          properties:
+            event:
+              type: string
+            contextPatch:
+              type: object
+
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        screenId:
+          type: string
+        start:
+          type: boolean
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edge'
+
+    Edge:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        event:
+          type: string
+        target:
+          type: string
+        contextPatch:
+          type: object
+          additionalProperties: true
+
+    NodeCreate:
+      type: object
+      required:
+        - id
+        - label
+        - type
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        screenId:
+          type: string
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edge'
+
+    NodeUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+        position:
+          type: object
+        edges:
+          type: array
+
+    EdgeCreate:
+      type: object
+      required:
+        - id
+        - source
+        - target
+        - event
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        label:
+          type: string
+        event:
+          type: string
+        contextPatch:
+          type: object
+
+    # ========== Analytics ==========
+    AnalyticsEventBatch:
+      type: object
+      required:
+        - productId
+        - sessionId
+        - events
+      properties:
+        productId:
+          type: string
+        sessionId:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsEvent'
+
+    AnalyticsEvent:
+      type: object
+      required:
+        - id
+        - type
+        - timestamp
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [SCREEN_VIEW, UI_CLICK, INTERACTION_TIME, SESSION_START]
+        timestamp:
+          type: integer
+          format: int64
+        screenId:
+          type: string
+        screenName:
+          type: string
+        nodeId:
+          type: string
+        componentId:
+          type: string
+        componentType:
+          type: string
+        label:
+          type: string
+        duration:
+          type: number
+
+    ProductAnalytics:
+      type: object
+      properties:
+        productId:
+          type: string
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+        metrics:
+          type: object
+          additionalProperties: true
+        topScreens:
+          type: array
+          items:
+            type: object
+            properties:
+              screenId:
+                type: string
+              screenName:
+                type: string
+              views:
+                type: integer
+              avgDuration:
+                type: number
+        topComponents:
+          type: array
+          items:
+            type: object
+            properties:
+              componentId:
+                type: string
+              componentType:
+                type: string
+              label:
+                type: string
+              clicks:
+                type: integer
+
+    Funnel:
+      type: object
+      properties:
+        name:
+          type: string
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              screenId:
+                type: string
+              screenName:
+                type: string
+              users:
+                type: integer
+              dropoff:
+                type: number
+        conversionRate:
+          type: number
+
+    Heatmap:
+      type: object
+      properties:
+        screenId:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        clicks:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+              y:
+                type: integer
+              count:
+                type: integer
+              componentId:
+                type: string
+
+    # ========== Assets ==========
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        filename:
+          type: string
+        size:
+          type: integer
+        mimeType:
+          type: string
+        dimensions:
+          type: object
+          properties:
+            width:
+              type: integer
+            height:
+              type: integer
+        productId:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+        uploadedBy:
+          $ref: '#/components/schemas/UserInfo'
+
+    # ========== Webhooks ==========
+    WebhookCreate:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        secret:
+          type: string
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, inactive]
+
+    # ========== Common ==========
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              value:
+                oneOf:
+                  - type: string
+                  - type: number
+                  - type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Неверный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Validation failed
+            code: VALIDATION_ERROR
+            details:
+              - field: slug
+                message: Slug must be unique
+                value: existing-slug
+
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            code: UNAUTHORIZED
+            message: Invalid or missing token
+
+    Forbidden:
+      description: Доступ запрещён
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Forbidden
+            code: FORBIDDEN
+            message: Insufficient permissions
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Product not found
+            code: PRODUCT_NOT_FOUND
+            productId: prod-123
+
+    Conflict:
+      description: Конфликт ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Cannot delete product with active sessions
+            code: PRODUCT_IN_USE
+            activeSessions: 5
+
+    RateLimitExceeded:
+      description: Превышен лимит запросов
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Лимит запросов
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Оставшиеся запросы
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Timestamp сброса лимита
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Rate limit exceeded
+            code: RATE_LIMIT_EXCEEDED
+            retryAfter: 60

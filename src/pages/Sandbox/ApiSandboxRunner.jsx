@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, History as HistoryIcon, PlugZap, RotateCcw } from 'lucide-react';
 import SandboxScreenRenderer from './SandboxScreenRenderer';
+import { useAnalytics } from '../../services/analytics';
 import './SandboxPage.css';
 
 const API_BASE = (import.meta.env.VITE_SANDBOX_API_BASE ?? '').replace(/\/$/, '');
@@ -66,6 +67,7 @@ const formatTime = (iso) => {
 };
 
 const ApiSandboxRunner = ({ initialData, onExit }) => {
+  const { trackScreenView, finalizeScreenTiming } = useAnalytics();
   const [screen, setScreen] = useState(initialData?.screen ?? null);
   const [context, setContext] = useState(initialData?.context ?? {});
   const [formValues, setFormValues] = useState(() => ({ ...(initialData?.context?.inputs || {}) }));
@@ -158,6 +160,34 @@ const ApiSandboxRunner = ({ initialData, onExit }) => {
       .filter((entry) => entry.key)
       .sort((a, b) => a.key.localeCompare(b.key))
   ), [context]);
+
+  useEffect(() => {
+    if (!screen?.id) {
+      return () => {};
+    }
+
+    const screenName = screen?.name ?? screen?.title ?? String(screen.id);
+    const productId = context?.product?.id ?? context?.metadata?.productId ?? 'api-sandbox';
+
+    trackScreenView({
+      screenId: screen.id,
+      screenName,
+      nodeId: screen.id,
+      productId
+    });
+
+    return () => {
+      finalizeScreenTiming('api_screen_cleanup');
+    };
+  }, [
+    screen?.id,
+    screen?.name,
+    screen?.title,
+    context?.product?.id,
+    context?.metadata?.productId,
+    trackScreenView,
+    finalizeScreenTiming
+  ]);
 
   return (
     <div className="sandbox-page sandbox-api-mode">

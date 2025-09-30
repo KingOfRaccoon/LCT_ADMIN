@@ -18,6 +18,7 @@ import {
   RotateCcw,
   PlugZap
 } from 'lucide-react';
+import { useAnalytics } from '../../services/analytics';
 import './SandboxPage.css';
 
 const isPlainObject = (value) => (
@@ -169,6 +170,7 @@ const getInitialNodeId = (product) => (
 
 const SandboxPage = () => {
   const location = useLocation();
+  const { trackScreenView, finalizeScreenTiming } = useAnalytics();
   const runtimeProduct = location.state?.product;
   const runtimeSchemas = location.state?.variableSchemas;
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
@@ -332,6 +334,41 @@ const SandboxPage = () => {
 
     return { type: 'empty' };
   }, [contextState, currentNode, currentScreen]);
+
+  useEffect(() => {
+    const screenId = currentScreen?.id ?? currentNode?.screenId ?? currentNodeId;
+    if (!screenId) {
+      return () => {};
+    }
+
+    const screenName = currentScreen?.name
+      ?? currentNode?.label
+      ?? String(screenId);
+    const productId = product?.id ?? product?.slug ?? product?.name ?? 'bdui-product';
+
+    trackScreenView({
+      screenId,
+      screenName,
+      nodeId: currentNode?.id ?? currentNodeId,
+      productId
+    });
+
+    return () => {
+      finalizeScreenTiming('screen_effect_cleanup');
+    };
+  }, [
+    currentScreen?.id,
+    currentScreen?.name,
+    currentNode?.id,
+    currentNode?.label,
+    currentNode?.screenId,
+    currentNodeId,
+    product?.id,
+    product?.slug,
+    product?.name,
+    trackScreenView,
+    finalizeScreenTiming
+  ]);
 
   const handleReset = useCallback(() => {
     setContextState(cloneContext(product.initialContext));

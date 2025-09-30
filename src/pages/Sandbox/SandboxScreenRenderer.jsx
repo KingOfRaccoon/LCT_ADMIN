@@ -5,6 +5,7 @@ import {
   isBindingValue
 } from './utils/bindings';
 import { resolveWidgetStyles } from '../../styles/resolveWidgetStyles';
+import { useAnalyticsOptional } from '../../services/analytics';
 import '../ScreenBuilder/ScreenBuilder.css';
 
 const spacingToCss = (value) => {
@@ -50,7 +51,10 @@ const SandboxScreenRenderer = ({
   formValues = {},
   isEventPending = false
 }) => {
+  const { trackClick } = useAnalyticsOptional();
   const components = useMemo(() => (screen?.components ?? []), [screen?.components]);
+  const activeScreenId = screen?.id ?? screen?.screenId ?? null;
+  const activeScreenName = screen?.name ?? screen?.title ?? (activeScreenId ? String(activeScreenId) : null);
 
   const componentsMap = useMemo(() => {
     const map = new Map();
@@ -340,6 +344,14 @@ const SandboxScreenRenderer = ({
         const disabledProp = Boolean(resolveProp(props, 'disabled', false));
         const isDisabled = disabledProp || (isEventPending && eventName);
         const handleClick = () => {
+          trackClick({
+            componentId: component.id ?? null,
+            componentType: component.type,
+            screenId: activeScreenId,
+            screenName: activeScreenName,
+            label: textValue,
+            eventName: eventName || null
+          });
           if (!eventName || typeof onEvent !== 'function') {
             return;
           }
@@ -396,6 +408,14 @@ const SandboxScreenRenderer = ({
         );
 
         const handleChange = (event) => {
+          trackClick({
+            componentId: component.id ?? null,
+            componentType: component.type,
+            screenId: activeScreenId,
+            screenName: activeScreenName,
+            label: name || placeholder || component.id || 'input',
+            eventName: 'input_change'
+          });
           if (!editable) {
             return;
           }

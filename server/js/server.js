@@ -13,7 +13,10 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const DATASET_PATH = path.resolve(ROOT_DIR, 'src/pages/Sandbox/data/ecommerceDashboard.json');
+
+// Support multiple presets: switch via environment variable or default to avitoDemo
+const PRESET_NAME = process.env.SANDBOX_PRESET || 'avitoDemo';
+const DATASET_PATH = path.resolve(ROOT_DIR, `src/pages/Sandbox/data/${PRESET_NAME}.json`);
 
 const deepClone = (value) => {
   if (typeof structuredClone === 'function') {

@@ -14,11 +14,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0' # можно поменять версию под ваш проект
+          node-version: '22.12.0'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build React app
         run: npm run build
@@ -27,7 +27,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: react-app
-          path: build # стандартная папка билда React
+          path: ./build/**   
+          if-no-files-found: error
 
   deploy:
     needs: build
@@ -37,6 +38,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: react-app
+          path: ./react-build 
 
       - name: Deploy via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -44,8 +46,8 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: './*'
-          target: '/var/www/myapp' # Путь до web-директории на сервере
+          source: './react-build/*'
+          target: '/var/www/myapp'
 
       - name: Restart web server
         uses: appleboy/ssh-action@v1.0.3
@@ -54,5 +56,5 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            sudo systemctl restart nginx # или apache2, если используется Apache
+            sudo systemctl restart nginx
             echo "React app deployed and web server restarted successfully!"

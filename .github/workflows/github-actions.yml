@@ -57,3 +57,4 @@ jobs:
           script: |
             sudo systemctl restart nginx
             echo "React application deployed successfully!"
+

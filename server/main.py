@@ -1,9 +1,23 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 from .bindings import apply_context_patch, render_screen
+from .sandbox_flow import handle_action, start_response
 
 app = FastAPI(title='Sandbox Binding API')
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:4173',
+        'http://127.0.0.1:4173'
+    ],
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 
 class ApplyTransitionRequest(BaseModel):
@@ -26,6 +40,19 @@ class RenderScreenRequest(BaseModel):
 class RenderScreenResponse(BaseModel):
     resolved_schema: Dict[str, Any]
     trace: Optional[Any] = None
+
+
+@app.get('/api/start/')
+def sandbox_start():
+    """Возвращает стартовый экран и начальный контекст для песочницы."""
+    return start_response()
+
+
+@app.get('/api/action')
+async def sandbox_action(request: Request, event: str = Query(..., description='Имя события, которое произошло на экране')):
+    """Обрабатывает событие песочницы и возвращает новый экран."""
+    params = dict(request.query_params)
+    return handle_action(event, params)
 
 
 @app.post('/apply-transition', response_model=ApplyTransitionResponse)

@@ -31,7 +31,8 @@ const ProductOverview = () => {
     addScreen, 
     deleteScreen,
     setCurrentScreen,
-    setScreens
+    setScreens,
+    updateApiEndpointsInGraph
   } = useVirtualContext();
 
   // Local state for product metadata editing
@@ -56,6 +57,13 @@ const ProductOverview = () => {
     enableRealTimeUpdates: true,
     enableOfflineMode: false
   });
+
+  // Синхронизация endpoint для всех API Call при изменении apiBaseUrl
+  useEffect(() => {
+    if (globalSettings.apiBaseUrl) {
+      updateApiEndpointsInGraph(globalSettings.apiBaseUrl);
+    }
+  }, [globalSettings.apiBaseUrl, updateApiEndpointsInGraph]);
 
   // Mock screens data
   const [productScreens, setProductScreens] = useState([
@@ -462,10 +470,14 @@ const ProductOverview = () => {
                 <input 
                   type="url"
                   value={globalSettings.apiBaseUrl}
-                  onChange={(e) => setGlobalSettings({
-                    ...globalSettings,
-                    apiBaseUrl: e.target.value
-                  })}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setGlobalSettings((prev) => ({
+                      ...prev,
+                      apiBaseUrl: newValue
+                    }));
+                    // updateApiEndpointsInGraph(newValue); // useEffect отработает
+                  }}
                 />
               </div>
               

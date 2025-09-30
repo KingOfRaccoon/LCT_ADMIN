@@ -1,4 +1,4 @@
-import logger from '../../../utils/logger';
+import logger from '../../../utils/logger.js';
 
 const cloneDeep = (value) => {
   if (typeof structuredClone === 'function') {
@@ -21,6 +21,7 @@ const cloneDeep = (value) => {
 
 // Runtime helper: reliably detect development mode across Vite/browser/node
 const isSandboxDev = (() => {
+  return false; // disable all debug logs in production for performance
   // Browser heuristic: localhost or common dev port (5173)
   try {
     if (typeof window !== 'undefined' && typeof location !== 'undefined') {

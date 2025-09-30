@@ -42,7 +42,14 @@ const mergeStyles = (base = {}, componentStyle = {}) => ({
   ...componentStyle
 });
 
-const SandboxScreenRenderer = ({ screen, context }) => {
+const SandboxScreenRenderer = ({
+  screen,
+  context,
+  onEvent,
+  onInputChange,
+  formValues = {},
+  isEventPending = false
+}) => {
   const components = useMemo(() => (screen?.components ?? []), [screen?.components]);
 
   const componentsMap = useMemo(() => {
@@ -252,6 +259,34 @@ const SandboxScreenRenderer = ({ screen, context }) => {
         );
       }
 
+      case 'Section':
+      case 'section': {
+        const paddingValue = paddingToCss(props?.padding);
+        const spacingValue = spacingToCss(props?.spacing ?? 0);
+        const flexDirection = props?.flexDirection ?? 'column';
+        const baseStyle = {
+          display: 'flex',
+          flexDirection,
+          gap: spacingValue,
+          alignItems: props?.alignItems,
+          justifyContent: props?.justifyContent,
+          padding: paddingValue,
+          background: props?.background ?? component.style?.background ?? 'transparent',
+          width: props?.width ?? component.style?.width ?? '100%'
+        };
+        const style = mergeStyles(baseStyle, component.style);
+
+        return (
+          <div
+            className="sandbox-section"
+            style={style}
+            data-slot={props?.slot || undefined}
+          >
+            {renderChildren(component, iterationStack)}
+          </div>
+        );
+      }
+
       case 'container': {
         const paddingValue = paddingToCss(props?.padding ?? 0);
         const style = mergeStyles(
@@ -300,12 +335,25 @@ const SandboxScreenRenderer = ({ screen, context }) => {
         const size = resolveProp(props, 'size', 'medium');
         const widgetStyle = resolveWidgetStyles('button', { variant, size });
         const style = mergeStyles(widgetStyle?.style ?? {}, component.style);
+        const rawEventName = resolveProp(props, 'event', component?.event ?? null);
+        const eventName = typeof rawEventName === 'string' ? rawEventName.trim() : '';
+        const disabledProp = Boolean(resolveProp(props, 'disabled', false));
+        const isDisabled = disabledProp || (isEventPending && eventName);
+        const handleClick = () => {
+          if (!eventName || typeof onEvent !== 'function') {
+            return;
+          }
+          onEvent(eventName);
+        };
 
         return (
           <button
             type="button"
             className={`canvas-button ${variant} ${size}`}
             style={style}
+            onClick={handleClick}
+            disabled={isDisabled}
+            data-event={eventName || undefined}
           >
             {textValue}
           </button>
@@ -332,6 +380,14 @@ const SandboxScreenRenderer = ({ screen, context }) => {
         const rawPlaceholder = resolveBinding(props?.placeholder, '');
         const placeholder = formatForDisplay(rawPlaceholder);
         const required = Boolean(resolveProp(props, 'required', false));
+        const name = resolveProp(props, 'name', component?.name ?? '');
+        const helperText = resolveProp(props, 'helperText', undefined);
+        const resolvedValue = resolveBinding(props?.value, undefined);
+        const valueFromForm = (name && Object.prototype.hasOwnProperty.call(formValues, name))
+          ? formValues[name]
+          : resolvedValue;
+        const value = valueFromForm ?? '';
+        const editable = Boolean(name && typeof onInputChange === 'function');
         const style = mergeStyles(
           {
             width: '100%'
@@ -339,15 +395,30 @@ const SandboxScreenRenderer = ({ screen, context }) => {
           component.style
         );
 
+        const handleChange = (event) => {
+          if (!editable) {
+            return;
+          }
+          onInputChange(name, event.target.value);
+        };
+
         return (
-          <input
-            type={inputType}
-            placeholder={placeholder}
-            className="canvas-input"
-            style={style}
-            required={required}
-            readOnly
-          />
+          <div className="sandbox-input-wrapper">
+            <input
+              type={inputType}
+              name={name || undefined}
+              placeholder={placeholder}
+              className="canvas-input"
+              style={style}
+              required={required}
+              readOnly={!editable}
+              value={value}
+              onChange={handleChange}
+            />
+            {helperText ? (
+              <p className="sandbox-input-helper">{formatForDisplay(helperText)}</p>
+            ) : null}
+          </div>
         );
       }
 

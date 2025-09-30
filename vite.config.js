@@ -115,7 +115,24 @@ const screenStorageApiPlugin = () => {
   };
 };
 
+const sandboxApiProxyTarget = process.env.SANDBOX_API_PROXY?.trim() || 'http://localhost:5050';
+const isProxyEnabled = sandboxApiProxyTarget !== 'off';
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), screenStorageApiPlugin(), graphStorageApiPlugin()]
+  plugins: [react(), screenStorageApiPlugin(), graphStorageApiPlugin()],
+  server: isProxyEnabled
+    ? {
+        proxy: {
+          '/api/start': {
+            target: sandboxApiProxyTarget,
+            changeOrigin: true
+          },
+          '/api/action': {
+            target: sandboxApiProxyTarget,
+            changeOrigin: true
+          }
+        }
+      }
+    : undefined
 });

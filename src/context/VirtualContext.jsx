@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import logger from '../utils/logger';
 
 // Virtual Context for managing global state and variables
 const VirtualContext = createContext();
@@ -24,7 +23,35 @@ const ACTIONS = {
   UPDATE_NODE: 'UPDATE_NODE',
   DELETE_NODE: 'DELETE_NODE',
   ADD_EDGE: 'ADD_EDGE',
-  DELETE_EDGE: 'DELETE_EDGE'
+  DELETE_EDGE: 'DELETE_EDGE',
+  REGISTER_DEPENDENCY: 'REGISTER_DEPENDENCY',
+  UNREGISTER_DEPENDENCY: 'UNREGISTER_DEPENDENCY',
+  UPDATE_API_ENDPOINTS_IN_GRAPH: 'UPDATE_API_ENDPOINTS_IN_GRAPH',
+  UPDATE_API_ENDPOINT_FOR_NODE: 'UPDATE_API_ENDPOINT_FOR_NODE'
+};
+
+const areValuesEqual = (a, b) => {
+  if (a === b) {
+    return true;
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) {
+      return false;
+    }
+    return a.every((item, index) => areValuesEqual(item, b[index]));
+  }
+
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+    return keysA.every((key) => areValuesEqual(a[key], b[key]));
+  }
+
+  return false;
 };
 
 // Initial state
@@ -34,19 +61,16 @@ const initialState = {
     // Example: { userId: { value: '123', type: 'string', source: 'action' } }
   },
   variablesOrder: [],
-  
+  // Карта зависимостей: { [varName]: [dependentVar1, ...] }
+  dependencyMap: {},
   // Current product being edited
   currentProduct: null,
-  
   // All products
   products: [],
-  
   // Current screen being edited
   currentScreen: null,
-  
   // All screens in current product
   screens: [],
-  
   // Graph data for current screen (nodes and edges)
   graphData: {
     nodes: [],
@@ -57,10 +81,37 @@ const initialState = {
 
 // Reducer function
 function virtualContextReducer(state, action) {
+  // Регистрация зависимости: parent -> child
+  if (action.type === ACTIONS.REGISTER_DEPENDENCY) {
+    const { parent, child } = action.payload;
+    const current = state.dependencyMap[parent] || [];
+    if (!current.includes(child)) {
+      return {
+        ...state,
+        dependencyMap: {
+          ...state.dependencyMap,
+          [parent]: [...current, child]
+        }
+      };
+    }
+    return state;
+  }
+  // Удаление зависимости: parent -> child
+  if (action.type === ACTIONS.UNREGISTER_DEPENDENCY) {
+    const { parent, child } = action.payload;
+    const current = state.dependencyMap[parent] || [];
+    return {
+      ...state,
+      dependencyMap: {
+        ...state.dependencyMap,
+        [parent]: current.filter(dep => dep !== child)
+      }
+    };
+  }
   switch (action.type) {
     case ACTIONS.SET_VARIABLE: {
-      const isExistingVariable = Boolean(state.variables[action.payload.name]);
-      const existingSchema = state.variableSchemas[action.payload.name];
+  const isExistingVariable = Boolean(state.variables[action.payload.name]);
+  const existingSchema = state.variableSchemas[action.payload.name];
 
       // Defensive type inference at reducer level: if the caller didn't
       // provide a type (or provided an overly-generic 'string'), infer
@@ -90,17 +141,7 @@ function virtualContextReducer(state, action) {
 
       // Avoid noisy per-variable tracing in production/development unless
       // explicitly enabled via window.__VC_TRACE__ (helps local debugging).
-      if (typeof window !== 'undefined' && (typeof window.__VC_TRACE__ !== 'undefined' ? window.__VC_TRACE__ : false) && action.payload.name === 'gamesList') {
-        try {
-          logger.debug('[VirtualContext] SET_VARIABLE trace for gamesList', {
-            prev: state.variables['gamesList'],
-            payload: action.payload,
-            resolvedType
-          });
-        } catch {
-          /* ignore logging errors */
-        }
-      }
+
 
       // Priority logic for source types: 'action' should override 'binding'
       const newSource = action.payload.source || 'manual';
@@ -119,16 +160,31 @@ function virtualContextReducer(state, action) {
             ? existingVar.value
             : action.payload.value);
 
+      const nextVar = {
+        value: valueToStore,
+        type: resolvedType,
+        source: newSource,
+        description: action.payload.description || ''
+      };
+
+      if (isExistingVariable) {
+        const currentVar = state.variables[action.payload.name];
+        const noValueChange = areValuesEqual(currentVar?.value, nextVar.value);
+        const noMetaChange = currentVar
+          && currentVar.type === nextVar.type
+          && currentVar.source === nextVar.source
+          && currentVar.description === nextVar.description;
+
+        if (noValueChange && noMetaChange) {
+          return state;
+        }
+      }
+
       return {
         ...state,
         variables: {
           ...state.variables,
-          [action.payload.name]: {
-            value: valueToStore,
-            type: resolvedType,
-            source: newSource,
-            description: action.payload.description || ''
-          }
+          [action.payload.name]: nextVar
         },
         variableSchemas: existingSchema
           ? {
@@ -326,6 +382,58 @@ function virtualContextReducer(state, action) {
         }
       };
 
+    case ACTIONS.UPDATE_API_ENDPOINTS_IN_GRAPH: {
+      const { apiBaseUrl, endpointMap = {} } = action.payload;
+      return {
+        ...state,
+        graphData: {
+          ...state.graphData,
+          nodes: state.graphData.nodes.map((node) => {
+            if (node.type === 'api') {
+              const newEndpoint = endpointMap[node.id] ?? node.data?.config?.endpoint;
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: {
+                    ...node.data?.config,
+                    apiBaseUrl,
+                    endpoint: newEndpoint
+                  }
+                }
+              };
+            }
+            return node;
+          })
+        }
+      };
+    }
+
+    case ACTIONS.UPDATE_API_ENDPOINT_FOR_NODE: {
+      const { nodeId, endpoint } = action.payload;
+      return {
+        ...state,
+        graphData: {
+          ...state.graphData,
+          nodes: state.graphData.nodes.map((node) => {
+            if (node.id === nodeId && node.type === 'api') {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: {
+                    ...node.data?.config,
+                    endpoint
+                  }
+                }
+              };
+            }
+            return node;
+          })
+        }
+      };
+    }
+
     default:
       return state;
   }
@@ -334,26 +442,11 @@ function virtualContextReducer(state, action) {
 // Context Provider Component
 export function VirtualContextProvider({ children }) {
   const [state, dispatch] = useReducer(virtualContextReducer, initialState);
+  const stateRef = useRef(state);
 
-  // Helper functions
-  const setVariable = useCallback((name, value, type, source, description) => {
-    // If caller didn't provide a type, infer it from the value to keep
-    // list/object variables (like gamesList from API) typed correctly.
-    const inferType = (val) => {
-      if (Array.isArray(val)) return 'list';
-      if (val !== null && typeof val === 'object') return 'object';
-      return 'string';
-    };
-
-    const resolvedType = type || inferType(value);
-
-    // Temporary debug logging removed — inference logic should be stable now.
-
-    dispatch({
-      type: ACTIONS.SET_VARIABLE,
-      payload: { name, value, type: resolvedType, source, description }
-    });
-  }, []);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const deleteVariable = useCallback((name) => {
     dispatch({
@@ -466,17 +559,114 @@ export function VirtualContextProvider({ children }) {
     });
   }, []);
 
+
+  // Регистрирует зависимость: parent -> child
+  const registerDependency = useCallback((parent, child) => {
+    dispatch({
+      type: ACTIONS.REGISTER_DEPENDENCY,
+      payload: { parent, child }
+    });
+  }, []);
+
+  // Удаляет зависимость: parent -> child
+  const unregisterDependency = useCallback((parent, child) => {
+    dispatch({
+      type: ACTIONS.UNREGISTER_DEPENDENCY,
+      payload: { parent, child }
+    });
+  }, []);
+
+
+  // Сначала setGraphData, затем useCallback, которые его используют
+
+  // --- API endpoint update helpers ---
+  // Глобальное обновление всех endpoint-ов API Call в graphData
+  const updateApiEndpointsInGraph = useCallback((newApiBaseUrl, endpointMap = {}) => {
+    dispatch({
+      type: ACTIONS.UPDATE_API_ENDPOINTS_IN_GRAPH,
+      payload: {
+        apiBaseUrl: newApiBaseUrl,
+        endpointMap
+      }
+    });
+  }, [dispatch]);
+
+  // Обновление endpoint для одного API Call node
+  const updateApiEndpointForNode = useCallback((nodeId, newEndpoint) => {
+    dispatch({
+      type: ACTIONS.UPDATE_API_ENDPOINT_FOR_NODE,
+      payload: {
+        nodeId,
+        endpoint: newEndpoint
+      }
+    });
+  }, [dispatch]);
+
+  const updateDependents = useCallback((name, visited = new Set()) => {
+    if (visited.has(name)) {
+      return;
+    }
+    visited.add(name);
+
+    const currentState = stateRef.current;
+    const dependents = currentState?.dependencyMap?.[name] || [];
+
+    dependents.forEach((depName) => {
+      if (visited.has(depName)) {
+        return;
+      }
+
+      const depVar = currentState?.variables?.[depName];
+      if (!depVar) {
+        return;
+      }
+
+      dispatch({
+        type: ACTIONS.SET_VARIABLE,
+        payload: {
+          name: depName,
+          value: depVar.value,
+          type: depVar.type,
+          source: depVar.source,
+          description: depVar.description || ''
+        }
+      });
+
+      updateDependents(depName, visited);
+    });
+  }, [dispatch]);
+
+  // Helper functions
+  const setVariable = useCallback((name, value, type, source, description) => {
+    // If caller didn't provide a type, infer it from the value to keep
+    // list/object variables (like gamesList from API) typed correctly.
+    const inferType = (val) => {
+      if (Array.isArray(val)) return 'list';
+      if (val !== null && typeof val === 'object') return 'object';
+      return 'string';
+    };
+
+    const resolvedType = type || inferType(value);
+
+    dispatch({
+      type: ACTIONS.SET_VARIABLE,
+      payload: { name, value, type: resolvedType, source, description }
+    });
+
+    updateDependents(name);
+  }, [updateDependents]);
+
   const value = {
     // State
     variables: state.variables,
     variablesOrder: state.variablesOrder,
+    dependencyMap: state.dependencyMap,
     currentProduct: state.currentProduct,
     products: state.products,
     currentScreen: state.currentScreen,
     screens: state.screens,
     graphData: state.graphData,
     variableSchemas: state.variableSchemas,
-    
     // Actions
     setVariable,
     deleteVariable,
@@ -494,7 +684,11 @@ export function VirtualContextProvider({ children }) {
     updateNode,
     deleteNode,
     addEdge,
-    deleteEdge
+    deleteEdge,
+    registerDependency,
+    unregisterDependency,
+    updateApiEndpointsInGraph,
+    updateApiEndpointForNode
   };
 
   return (

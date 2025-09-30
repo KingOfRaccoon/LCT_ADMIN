@@ -33,6 +33,7 @@ import { buildProductFromBuilder } from '../../utils/productSerializer.js';
 import SandboxScreenRenderer from '../Sandbox/SandboxScreenRenderer.jsx';
 import { resolveBindingValue } from '../Sandbox/utils/bindings.js';
 import defaultScreenTemplate from '../../data/defaultScreenTemplate.json';
+import defaultGraphTemplate from '../../data/defaultGraphTemplate.json';
 import screenConfigs from '../../data/screenConfigs.json';
 import graphConfigs from '../../data/graphConfigs.json';
 
@@ -2000,21 +2001,9 @@ const ScreenBuilder = () => {
   );
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('screen-storage');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        screenStorageRef.current = parsed && typeof parsed === 'object' ? parsed : {};
-      } else {
-        screenStorageRef.current = {};
-      }
-    } catch (error) {
-      console.error('Failed to read local screen storage', error);
-      screenStorageRef.current = {};
-      toast.error('Не удалось загрузить сохранённые экраны');
-    } finally {
-      setScreenStorageReady(true);
-    }
+    // Отключено: не читаем из localStorage, просто инициализируем пустым объектом
+    screenStorageRef.current = {};
+    setScreenStorageReady(true);
   }, []);
 
   const listContextBinding = useMemo(() => {
@@ -3061,32 +3050,13 @@ const ScreenBuilder = () => {
     try {
       setIsSavingScreen(true);
 
-      // Сохраняем graphData в defaultGraphTemplate.json через API
-      if (graphData && graphData.nodes && graphData.edges) {
-        try {
-          await fetch('/api/graph', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nodes: graphData.nodes, edges: graphData.edges })
-          });
-        } catch (err) {
-          console.error('Ошибка при сохранении graphData в JSON', err);
-        }
-      }
-
       screenStorageRef.current = {
         ...screenStorageRef.current,
         [screenId]: screenData
       };
 
-      try {
-        localStorage.setItem('screen-storage', JSON.stringify(screenStorageRef.current));
-      } catch (error) {
-        console.error('Failed to write screen storage', error);
-        throw error;
-      }
-
-      toast.success('Изменения экрана и графа сохранены');
+      // Отключено: не сохраняем в localStorage
+      toast.success('Изменения экрана сохранены (только в памяти)');
     } catch (error) {
       console.error('Failed to persist screen data', error);
       toast.error('Не удалось сохранить экран');
@@ -3196,31 +3166,31 @@ const ScreenBuilder = () => {
           graphDataToUse = {
             ...stored.graphData,
             nodes: [
-              ...(stored.graphData.nodes || []),
-              {
-                id: 'fetch-games',
-                type: 'action',
-                position: { x: 100, y: 100 },
-                data: {
-                  label: 'Fetch Games List',
-                  actionType: 'api',
-                  config: {
-                    endpoint: 'https://www.freetogame.com/api/games?platform=pc',
-                    method: 'GET',
-                    contextKey: 'gamesList',
-                    schema: {
-                      id: 'id',
-                      title: 'title',
-                      thumbnail: 'thumbnail',
-                      genre: 'genre',
-                      platform: 'platform',
-                      release_date: 'release_date',
-                      publisher: 'publisher',
-                      short_description: 'short_description'
-                    }
-                  }
-                }
-              }
+              ...(stored.graphData.nodes || [])
+              // {
+              //   id: 'fetch-games',
+              //   type: 'action',
+              //   position: { x: 100, y: 100 },
+              //   data: {
+              //     label: 'Fetch Games List',
+              //     actionType: 'api',
+              //     config: {
+              //       endpoint: 'https://www.freetogame.com/api/games?platform=pc',
+              //       method: 'GET',
+              //       contextKey: 'gamesList',
+              //       schema: {
+              //         id: 'id',
+              //         title: 'title',
+              //         thumbnail: 'thumbnail',
+              //         genre: 'genre',
+              //         platform: 'platform',
+              //         release_date: 'release_date',
+              //         publisher: 'publisher',
+              //         short_description: 'short_description'
+              //       }
+              //     }
+              //   }
+              // }
             ]
           };
         }
@@ -3341,9 +3311,9 @@ const ScreenBuilder = () => {
     setSelectedComponent(null);
     setPreviewMode(false);
     applyVariableDefinitions([]);
-    setGraphData(require('../../data/defaultGraphTemplate.json'));
+    setGraphData(defaultGraphTemplate);
     setVariableSchemas({});
-    console.log('📝 setGraphData called, next useEffect should trigger with:', require('../../data/defaultGraphTemplate.json'));
+    console.log('📝 setGraphData called, next useEffect should trigger with:', defaultGraphTemplate);
     initializedScreenRef.current = screenId;
   }, [applyVariableDefinitions, currentScreen?.name, screenId, screenStorageReady]); // eslint-disable-line react-hooks/exhaustive-deps
 

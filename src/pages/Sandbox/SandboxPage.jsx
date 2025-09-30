@@ -8,13 +8,15 @@ import {
   resolveBindingValue
 } from './utils/bindings';
 import SandboxScreenRenderer from './SandboxScreenRenderer';
-import { demoProduct } from './data/demoProduct';
+import ApiSandboxRunner from './ApiSandboxRunner';
+import ecommerceDashboard from './data/ecommerceDashboard.json';
 import {
   ArrowRight,
   GitBranch,
   History as HistoryIcon,
   PlayCircle,
-  RotateCcw
+  RotateCcw,
+  PlugZap
 } from 'lucide-react';
 import './SandboxPage.css';
 
@@ -126,7 +128,63 @@ const SandboxPage = () => {
   const location = useLocation();
   const runtimeProduct = location.state?.product;
   const runtimeSchemas = location.state?.variableSchemas;
-  const product = runtimeProduct || demoProduct;
+  const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
+  const [apiData, setApiData] = useState(null);
+  const [apiError, setApiError] = useState(null);
+  useEffect(() => {
+    if (runtimeProduct && apiMode !== 'disabled') {
+      setApiMode('disabled');
+    }
+  }, [runtimeProduct, apiMode]);
+
+  useEffect(() => {
+    if (apiMode !== 'checking') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStartScreen = async () => {
+      try {
+        const response = await fetch('/api/start/');
+        if (!response.ok) {
+          throw new Error(`API ответил статусом ${response.status}`);
+        }
+        const data = await response.json();
+        if (!cancelled) {
+          setApiData(data);
+          setApiError(null);
+          setApiMode('ready');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setApiError(err instanceof Error ? err.message : 'Не удалось подключиться к API');
+          setApiMode('error');
+        }
+      }
+    };
+
+    fetchStartScreen();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiMode]);
+
+  const handleDisableApi = useCallback(() => {
+    setApiMode('disabled');
+  }, []);
+
+  const handleRetryApi = useCallback(() => {
+    if (runtimeProduct) {
+      return;
+    }
+    setApiError(null);
+    setApiMode('checking');
+  }, [runtimeProduct]);
+
+  const product = runtimeProduct || ecommerceDashboard;
+  const isOfflineMode = Boolean(runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
   const variableSchemas = useMemo(
     () => runtimeSchemas || product.variableSchemas || {},
     [product, runtimeSchemas]
@@ -135,13 +193,24 @@ const SandboxPage = () => {
 
   const [currentNodeId, setCurrentNodeId] = useState(initialNodeId);
   const [contextState, setContextState] = useState(() => cloneContext(product.initialContext));
+  const [formValues, setFormValues] = useState(() => (
+    product?.initialContext?.inputs
+      ? { ...product.initialContext.inputs }
+      : {}
+  ));
   const [history, setHistory] = useState([]);
-
   useEffect(() => {
+    if (!isOfflineMode) {
+      return;
+    }
     setContextState(cloneContext(product.initialContext));
     setCurrentNodeId(getInitialNodeId(product));
     setHistory([]);
-  }, [product]);
+    setFormValues(product?.initialContext?.inputs ? { ...product.initialContext.inputs } : {});
+  }, [product, isOfflineMode]);
+
+  const isLoaderVisible = apiMode === 'checking';
+  const isApiReady = apiMode === 'ready' && Boolean(apiData);
 
   const currentNode = useMemo(
     () => product.nodes.find((node) => node.id === currentNodeId),
@@ -152,6 +221,8 @@ const SandboxPage = () => {
     [product, currentNode]
   );
   const availableEdges = currentNode?.edges ?? [];
+  const showApiBanner = !runtimeProduct && (apiMode === 'error' || apiMode === 'disabled');
+  const canRetryApi = !runtimeProduct;
 
   const nodePreview = useMemo(() => {
     if (!currentNode) {
@@ -202,7 +273,26 @@ const SandboxPage = () => {
     setContextState(cloneContext(product.initialContext));
     setCurrentNodeId(getInitialNodeId(product));
     setHistory([]);
+    setFormValues(product?.initialContext?.inputs ? { ...product.initialContext.inputs } : {});
   }, [product]);
+
+  const handleInputChange = useCallback((name, value) => {
+    if (!name) {
+      return;
+    }
+
+    setFormValues((prev) => {
+      if (prev[name] === value) {
+        return prev;
+      }
+      return { ...prev, [name]: value };
+    });
+
+    setContextState((prev) => {
+      const next = applyContextPatch(prev, { [`inputs.${name}`]: value }, prev);
+      return next;
+    });
+  }, []);
 
   const handleEdgeRun = useCallback((edge) => {
     if (!edge) {
@@ -248,6 +338,32 @@ const SandboxPage = () => {
   const schemaEntries = Object.entries(variableSchemas).map(([name, schema]) => ({ name, schema }));
 
   const orderStatus = getContextValue(contextState, 'data.order.status');
+
+  if (isLoaderVisible) {
+    return (
+      <div className="sandbox-page sandbox-api-loader">
+        <div className="sandbox-loader-card">
+          <PlugZap size={28} />
+          <h1>Подключаем API песочницы…</h1>
+          <p>Пробуем получить стартовый экран с локального сервера.</p>
+          <div className="sandbox-api-controls">
+            <button type="button" className="sandbox-reset secondary" onClick={handleDisableApi}>
+              Перейти в офлайн-режим
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isApiReady) {
+    return (
+      <ApiSandboxRunner
+        initialData={apiData}
+        onExit={handleDisableApi}
+      />
+    );
+  }
 
   return (
     <div className="sandbox-page">
@@ -390,6 +506,27 @@ const SandboxPage = () => {
       </div>
 
       <div className="sandbox-main">
+        {showApiBanner && (
+          <div className="sandbox-api-banner">
+            <div className="sandbox-api-banner-text">
+              <PlugZap size={16} />
+              <span>
+                {apiMode === 'error'
+                  ? `API режим недоступен${apiError ? `: ${apiError}` : ''}`
+                  : 'API режим отключён'}
+              </span>
+            </div>
+            {canRetryApi && (
+              <button
+                type="button"
+                className="sandbox-reset secondary"
+                onClick={handleRetryApi}
+              >
+                Подключить API
+              </button>
+            )}
+          </div>
+        )}
         <div className="sandbox-header">
           <div className="sandbox-header-text">
             <h1>{product.name}</h1>
@@ -414,7 +551,12 @@ const SandboxPage = () => {
 
         <div className="sandbox-preview">
           {nodePreview.type === 'screen' && (
-            <SandboxScreenRenderer screen={currentScreen} context={contextState} />
+            <SandboxScreenRenderer
+              screen={currentScreen}
+              context={contextState}
+              formValues={formValues}
+              onInputChange={handleInputChange}
+            />
           )}
 
           {nodePreview.type === 'api' && (

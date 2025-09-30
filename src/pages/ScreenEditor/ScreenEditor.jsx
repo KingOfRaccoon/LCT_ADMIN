@@ -695,7 +695,8 @@ const ScreenEditor = () => {
     updateScreen,
     deleteScreen,
     currentScreen,
-    setCurrentScreen
+    setCurrentScreen,
+    updateApiEndpointForNode
   } = useVirtualContext();
 
   const variablesRef = useRef(variables);
@@ -1510,6 +1511,11 @@ const ScreenEditor = () => {
         };
         updatedNodeRef = updatedNode;
 
+        // Если изменился endpoint, синхронизируем с VirtualContext
+        if (node.data?.actionType === 'api' && node.data?.config?.endpoint !== nextConfig?.endpoint) {
+          updateApiEndpointForNode(nodeId, nextConfig?.endpoint);
+        }
+
         if (node.data?.actionType === 'api') {
           pendingApiUpdate = {
             nodeId,
@@ -1544,78 +1550,43 @@ const ScreenEditor = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const loadStoredGraph = () => {
+
+    const loadGraphFromJson = async () => {
       try {
-        if (!screenId) {
-          throw new Error('Missing screen id');
-        }
+        // Импортируем дефолтный граф из JSON-файла
+        const graphJson = await import('../../data/defaultGraphTemplate.json');
+        const storedNodes = Array.isArray(graphJson.nodes) ? graphJson.nodes : [];
+        const storedEdges = Array.isArray(graphJson.edges) ? graphJson.edges : [];
 
-        const raw = localStorage.getItem(`flow-${screenId}`);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            const storedNodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
-            const storedEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
+        const hydratedNodes = hydrateGraphNodes(storedNodes, {
+          onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
+          onConfigChange: configChangeRef.current ?? handleNodeConfigChange,
+          onExecute: handleNodeExecute
+        });
 
-            if (storedNodes.length > 0) {
-              const hydratedNodes = hydrateGraphNodes(storedNodes, {
-                onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
-                onConfigChange: configChangeRef.current ?? handleNodeConfigChange,
-                onExecute: handleNodeExecute
-              });
-
-              if (!cancelled) {
-                // Update nodes only if they differ to avoid triggering extra renders
-                setNodes((current) => {
-                  try {
-                    if (JSON.stringify(current) === JSON.stringify(hydratedNodes)) {
-                      return current;
-                    }
-                  } catch (e) {
-                    // ignore stringify errors
-                  }
-                  return hydratedNodes;
-                });
-
-                setEdges((current) => {
-                  try {
-                    if (JSON.stringify(current) === JSON.stringify(storedEdges)) {
-                      return current;
-                    }
-                  } catch (e) {
-                    // ignore
-                  }
-                  return storedEdges;
-                });
-
-                setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
-                setHistoryIndex(0);
-
-                if (parsed.variableSchemas && typeof parsed.variableSchemas === 'object') {
-                  setVariableSchemas(parsed.variableSchemas);
-                }
-              }
-              return;
-            }
-          } catch {
-            console.warn('Failed to parse stored flow state');
+        if (!cancelled) {
+          setNodes(hydratedNodes);
+          setEdges(storedEdges);
+          setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
+          setHistoryIndex(0);
+          if (graphJson.variableSchemas && typeof graphJson.variableSchemas === 'object') {
+            setVariableSchemas(graphJson.variableSchemas);
           }
         }
-      } catch {
-        console.error('Failed to load stored graph data');
-      }
-
-      if (!cancelled) {
-        const defaults = buildDefaultGraph(handleNodeLabelChange, handleNodeConfigChange, handleNodeExecute);
-        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(defaults.nodes, defaults.edges);
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        setHistory([{ nodes: layoutedNodes, edges: layoutedEdges }]);
-        setHistoryIndex(0);
+      } catch (e) {
+        console.error('Failed to load graph from JSON', e);
+        if (!cancelled) {
+          const defaults = buildDefaultGraph(handleNodeLabelChange, handleNodeConfigChange, handleNodeExecute);
+          const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(defaults.nodes, defaults.edges);
+          setNodes(layoutedNodes);
+          setEdges(layoutedEdges);
+          setHistory([{ nodes: layoutedNodes, edges: layoutedEdges }]);
+          setHistoryIndex(0);
+        }
       }
     };
 
-    loadStoredGraph();
+    loadGraphFromJson();
 
     return () => {
       cancelled = true;
@@ -1822,9 +1793,22 @@ const ScreenEditor = () => {
   }, [nodes, edges, variablesList, currentScreen]);
 
   const saveFlow = useCallback(async () => {
+    
     if (!screenId) {
       toast.error('Не выбран экран для сохранения');
       return;
+    }
+
+    // 1. Очистить все переменные и схемы
+    console.log('[saveFlow] Очистка variableSchemas и переменных:', variablesList);
+    if (typeof resetVariableSchemas === 'function') resetVariableSchemas();
+    if (typeof variablesList === 'object' && Array.isArray(variablesList)) {
+      variablesList.forEach((name) => {
+        if (typeof deleteVariable === 'function') {
+          console.log(`[saveFlow] Удаляю переменную: ${name}`);
+          deleteVariable(name);
+        }
+      });
     }
 
     try {
@@ -1875,6 +1859,42 @@ const ScreenEditor = () => {
 
       setGraphData({ nodes: sanitizedNodes, edges: sanitizedEdges });
       setVariableSchemas(schemas);
+
+      // 2. Заново заполнить переменные на основе API-узлов и их outputBindings
+      sanitizedNodes.forEach((node) => {
+        if (node.data?.actionType === 'api') {
+          const config = node.data.config || {};
+          const contextKey = typeof config.contextKey === 'string' ? config.contextKey.trim() : '';
+          if (contextKey) {
+            // Если есть схема — используем тип из неё, иначе 'string'
+            const schemaMeta = schemas[contextKey];
+            let type = schemaMeta?.type || 'string';
+            let value = '';
+            if (type === 'list') value = [];
+            if (type === 'object') value = {};
+            console.log(`[saveFlow] Добавляю переменную из API-узла: ${contextKey}, type=${type}`);
+            setVariable(contextKey, value, type, 'api', node.data.label || '');
+          }
+          // Также outputBindings (если есть)
+          if (Array.isArray(node.data.outputBindings)) {
+            node.data.outputBindings.forEach((binding) => {
+              const varName = binding.variable?.trim();
+              if (varName) {
+                console.log(`[saveFlow] Добавляю outputBinding переменную: ${varName}`);
+                setVariable(varName, '', 'string', 'api', `Output binding of ${node.id}`);
+              }
+            });
+          }
+        }
+      });
+      // Лог финального состояния переменных
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          // eslint-disable-next-line no-console
+          console.log('[saveFlow] Итоговые переменные:', window.__VC_TRACE__ ? window.__VC_TRACE__ : variablesRef.current);
+        }
+      }, 500);
+
       synchronizeVariablesWithSchemas(schemas);
       toast.success('Flow saved successfully!');
     } catch {

@@ -1,6 +1,16 @@
 import widgetStyles from './widgetStyles.json';
 import { getToken } from './applyDesignTokens.js';
 
+const UNIT_LESS_PROPERTIES = new Set([
+  'fontWeight',
+  'flex',
+  'flexGrow',
+  'flexShrink',
+  'order',
+  'opacity',
+  'zIndex'
+]);
+
 const toKebabCase = (value) =>
   String(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
@@ -31,6 +41,26 @@ const mergeDefinitions = (definitions) => {
       }
     });
 
+    return acc;
+  }, {});
+};
+
+const normalizeStyleValues = (styleMap) => {
+  if (!styleMap || typeof styleMap !== 'object') {
+    return {};
+  }
+
+  return Object.entries(styleMap).reduce((acc, [key, value]) => {
+    if (value === undefined || value === null) {
+      return acc;
+    }
+
+    if (typeof value === 'number' && !UNIT_LESS_PROPERTIES.has(key)) {
+      acc[key] = `${value}px`;
+      return acc;
+    }
+
+    acc[key] = value;
     return acc;
   }, {});
 };
@@ -73,7 +103,9 @@ export const resolveWidgetStyles = (type, { variant, size } = {}) => {
     ...variantStyle
   };
 
-  const cssVariables = buildCssVariables(type, combinedStyle);
+  const normalizedStyle = normalizeStyleValues(combinedStyle);
+
+  const cssVariables = buildCssVariables(type, normalizedStyle);
 
   const stateVariables = {};
   if (config.states && typeof config.states === 'object') {
@@ -88,15 +120,16 @@ export const resolveWidgetStyles = (type, { variant, size } = {}) => {
           : stateDefinition;
 
       const resolvedStateStyle = mergeDefinitions([stateVariantDefinition]);
+      const normalizedStateStyle = normalizeStyleValues(resolvedStateStyle);
       Object.assign(
         stateVariables,
-        buildCssVariables(type, resolvedStateStyle, { prefix: `${stateName}` })
+        buildCssVariables(type, normalizedStateStyle, { prefix: `${stateName}` })
       );
     });
   }
 
   const style = {
-    ...combinedStyle,
+    ...normalizedStyle,
     ...cssVariables,
     ...stateVariables
   };

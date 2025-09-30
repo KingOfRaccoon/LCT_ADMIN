@@ -1,128 +1,126 @@
-import ecommerceDashboard from './ecommerceDashboard.json';
-
-export const demoProduct = ecommerceDashboard;
-export default ecommerceDashboard;
-
-/* Legacy inline dataset retained for reference.
-const legacyEcommerceDashboard = {
-  id: 'demo-checkout-product',
-  name: 'Demo Checkout Flow',
-  description: 'Мини-песочница для исследования переходов в воронке оформления заказа',
-  initialContext: {
-    ui: {
-      screen: {
-        title: 'Оформление заказа'
+{
+  "id": "ecommerce-dashboard",
+  "name": "E-commerce Dashboard",
+  "description": "Стартовая панель для анализа заказов и покупателей интернет-магазина",
+  "initialContext": {
+    "ui": {
+      "screen": {
+        "title": "E-commerce Dashboard"
       },
-      actions: {
-        submit: 'Оплатить заказ',
-        cancel: 'Отменить',
-        restart: 'Новый заказ'
+      "actions": {
+        "submit": "Создать заказ",
+        "cancel": "Отменить заказ",
+        "restart": "Новый клиент"
       },
-      form: {
-        promoPlaceholder: 'У меня есть промокод'
+      "form": {
+        "promoPlaceholder": "У меня есть промокод"
       },
-      notifications: {
-        lastAction: 'Заказ создан и ожидает оплаты'
+      "notifications": {
+        "lastAction": "Последнее действие: заказ создан"
       }
     },
-    data: {
-      order: {
-        status: 'draft',
-        total: 16110,
-        totalFormatted: '16 110 ₽'
+    "data": {
+      "order": {
+        "status": "draft",
+        "total": 16110,
+        "totalFormatted": "16 110 ₽"
       },
-      cart: {
-        items: [
+      "cart": {
+        "items": [
           {
-            title: 'Тариф «Премиум» — 9 990 ₽',
-            price: 9990,
-            priceFormatted: '9 990 ₽'
+            "title": "Тариф «Премиум» — 9 990 ₽",
+            "price": 9990,
+            "priceFormatted": "9 990 ₽"
           },
           {
-            title: 'Сопровождение запуска — 3 000 ₽',
-            price: 3000,
-            priceFormatted: '3 000 ₽'
+            "title": "Сопровождение запуска — 3 000 ₽",
+            "price": 3000,
+            "priceFormatted": "3 000 ₽"
           },
           {
-            title: 'Сопровождение запуска — 3 120 ₽',
-            price: 3120,
-            priceFormatted: '3 120 ₽'
+            "title": "Сопровождение запуска — 3 120 ₽",
+            "price": 3120,
+            "priceFormatted": "3 120 ₽"
           }
         ]
       },
-      user: {
-        email: 'founder@example.com'
+      "user": {
+        "email": "founder@example.com"
       }
+    },
+    "inputs": {
+      "email": "",
+      "promo": ""
     }
   },
-  nodes: [
+  "nodes": [
     {
-      id: 'checkout',
-      label: 'Оформление заказа',
-      screenId: 'screen-checkout',
-      start: true,
-      edges: [
+      "id": "checkout",
+      "label": "Оформление заказа",
+      "screenId": "screen-checkout",
+      "start": true,
+      "edges": [
         {
-          id: 'edge-submit-success',
-          label: 'Оплатить успешно',
-          target: 'success',
-          summary: 'Переход на экран успеха, обновляет статус заказа',
-          contextPatch: {
-            'data.order.status': 'paid',
-            'data.order.total': 16110,
-            'data.order.totalFormatted': '16 110 ₽',
-            'ui.notifications.lastAction': 'Платёж завершён, чек отправлен клиенту'
+          "id": "edge-submit-success",
+          "label": "Оплатить успешно",
+          "target": "success",
+          "summary": "Переход на экран успеха, обновляет статус заказа",
+          "contextPatch": {
+            "data.order.status": "paid",
+            "data.order.total": 16110,
+            "data.order.totalFormatted": "16 110 ₽",
+            "ui.notifications.lastAction": "Платёж завершён, чек отправлен клиенту"
           }
         },
         {
-          id: 'edge-submit-cancel',
-          label: 'Отменить заказ',
-          target: 'cancelled',
-          summary: 'Клиент отменяет оплату и возвращается в салес-воронку',
-          contextPatch: {
-            'data.order.status': 'cancelled',
-            'ui.notifications.lastAction': 'Заказ перенесён в отменённые'
+          "id": "edge-submit-cancel",
+          "label": "Отменить заказ",
+          "target": "cancelled",
+          "summary": "Клиент отменяет оплату и возвращается в салес-воронку",
+          "contextPatch": {
+            "data.order.status": "cancelled",
+            "ui.notifications.lastAction": "Заказ перенесён в отменённые"
           }
         }
       ]
     },
     {
-      id: 'success',
-      label: 'Оплата прошла',
-      screenId: 'screen-success',
-      edges: [
+      "id": "success",
+      "label": "Оплата прошла",
+      "screenId": "screen-success",
+      "edges": [
         {
-          id: 'edge-success-new-order',
-          label: 'Оформить новый заказ',
-          target: 'checkout',
-          summary: 'Возврат на основной экран с очисткой статуса',
-          contextPatch: {
-            'data.order.status': 'draft',
-            'ui.notifications.lastAction': 'Создан новый драфт заказа'
+          "id": "edge-success-new-order",
+          "label": "Оформить новый заказ",
+          "target": "checkout",
+          "summary": "Возврат на основной экран с очисткой статуса",
+          "contextPatch": {
+            "data.order.status": "draft",
+            "ui.notifications.lastAction": "Создан новый драфт заказа"
           }
         }
       ]
     },
     {
-      id: 'cancelled',
-      label: 'Заказ отменён',
-      screenId: 'screen-cancelled',
-      edges: [
+      "id": "cancelled",
+      "label": "Заказ отменён",
+      "screenId": "screen-cancelled",
+      "edges": [
         {
-          id: 'edge-cancelled-retry',
-          label: 'Вернуться к оплате',
-          target: 'checkout',
-          summary: 'Повторная попытка оплаты, сбрасывает статус заказа',
-          contextPatch: {
-            'data.order.status': 'draft',
-            'ui.notifications.lastAction': 'Клиент вернулся к оформлению'
+          "id": "edge-cancelled-retry",
+          "label": "Вернуться к оплате",
+          "target": "checkout",
+          "summary": "Повторная попытка оплаты, сбрасывает статус заказа",
+          "contextPatch": {
+            "data.order.status": "draft",
+            "ui.notifications.lastAction": "Клиент вернулся к оформлению"
           }
         }
       ]
     }
   ],
-  screens: {
-    'screen-checkout': {
+  "screens": {
+    "screen-checkout": {
       "id": "screen-cuhn04-1758927807107",
       "type": "Screen",
       "name": "Screen",
@@ -1217,6 +1215,94 @@ const legacyEcommerceDashboard = {
               }
             },
             {
+              "id": "column-email-1758927807107",
+              "type": "column",
+              "properties": {
+                "spacing": 12,
+                "padding": 24,
+                "alignItems": "flex-start",
+                "justifyContent": "flex-start",
+                "background": "#f8fafc"
+              },
+              "style": {
+                "borderRadius": "22px",
+                "border": "1px solid rgba(148, 163, 184, 0.16)",
+                "boxShadow": "0 18px 32px rgba(15, 23, 42, 0.08)",
+                "background": "#f8fafc"
+              },
+              "children": [
+                {
+                  "id": "text-email-title-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Контакт клиента",
+                    "variant": "subheading",
+                    "color": "#0f172a"
+                  },
+                  "style": {
+                    "fontSize": "20px",
+                    "fontWeight": 600
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "text-email-description-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Укажите email покупателя — на него отправим чек после оплаты.",
+                    "variant": "body",
+                    "color": "#475569"
+                  },
+                  "style": {
+                    "fontSize": "15px",
+                    "lineHeight": "22px"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "input-email-1758927807107",
+                  "type": "input",
+                  "properties": {
+                    "name": "email",
+                    "type": "email",
+                    "placeholder": "buyer@example.com",
+                    "required": true,
+                    "helperText": "Email будет сохранён в карточке заказа",
+                    "value": {
+                      "value": "",
+                      "reference": "${inputs.email}"
+                    }
+                  },
+                  "style": {
+                    "width": "100%",
+                    "height": "46px",
+                    "borderRadius": "14px",
+                    "border": "1px solid rgba(148, 163, 184, 0.32)",
+                    "background": "#ffffff",
+                    "padding": "0 18px",
+                    "fontSize": "15px"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
               "id": "row-ypp07r-1758927807107",
               "type": "row",
               "properties": {
@@ -1236,7 +1322,8 @@ const legacyEcommerceDashboard = {
                   "properties": {
                     "text": "Сохранить как черновик",
                     "variant": "secondary",
-                    "size": "medium"
+                    "size": "medium",
+                    "event": "cancel"
                   },
                   "style": {
                     "height": "44px",
@@ -1259,7 +1346,8 @@ const legacyEcommerceDashboard = {
                   "properties": {
                     "text": "Запланировать публикацию",
                     "variant": "primary",
-                    "size": "medium"
+                    "size": "medium",
+                    "event": "pay"
                   },
                   "style": {
                     "height": "44px",
@@ -1391,179 +1479,428 @@ const legacyEcommerceDashboard = {
       },
       "references": {}
     },
-    'screen-success': {
-      id: 'screen-success',
-      name: 'Success',
-      components: [
-        {
-          id: 'success-root',
-          type: 'screen',
-          children: ['success-wrapper'],
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100%',
-            background: 'linear-gradient(180deg, rgba(187,247,208,0.32) 0%, rgba(220,252,231,1) 100%)'
-          }
-        },
-        {
-          id: 'success-wrapper',
-          type: 'column',
-          parentId: 'success-root',
-          children: ['success-badge', 'success-title', 'success-description'],
-          props: {
-            spacing: 16,
-            padding: 32
+    "screen-success": {
+      "id": "screen-success-1758927807107",
+      "type": "Screen",
+      "name": "Success",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "720px",
+        "backgroundColor": "linear-gradient(180deg, rgba(187,247,208,0.32) 0%, rgba(220,252,231,1) 100%)",
+        "borderRadius": "var(--screen-radius, 32px)",
+        "border": "1px solid rgba(22, 101, 52, 0.24)",
+        "boxShadow": "0 32px 60px rgba(22, 101, 52, 0.22)",
+        "padding": "0px",
+        "gap": "0px"
+      },
+      "sections": {
+        "body": {
+          "id": "body-success-1758927807107",
+          "type": "Section",
+          "properties": {
+            "slot": "body",
+            "padding": 48,
+            "alignItems": "center",
+            "justifyContent": "center",
+            "background": "transparent"
           },
-          style: {
-            background: '#ffffff',
-            borderRadius: '32px',
-            boxShadow: '0px 32px 80px rgba(22,101,52,0.18)',
-            maxWidth: '440px',
-            textAlign: 'center'
-          }
-        },
-        {
-          id: 'success-badge',
-          type: 'text',
-          parentId: 'success-wrapper',
-          props: {
-            variant: 'badge',
-            content: {
-              value: 'Оплата прошла'
+          "style": {
+            "flex": "1 1 auto",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "background": "transparent"
+          },
+          "children": [
+            {
+              "id": "column-success-main-1758927807107",
+              "type": "column",
+              "properties": {
+                "spacing": 16,
+                "padding": 40,
+                "alignItems": "center",
+                "justifyContent": "center",
+                "background": "#ffffff"
+              },
+              "style": {
+                "maxWidth": "480px",
+                "width": "100%",
+                "borderRadius": "32px",
+                "boxShadow": "0 32px 80px rgba(22, 101, 52, 0.18)",
+                "textAlign": "center",
+                "gap": "16px"
+              },
+              "children": [
+                {
+                  "id": "text-success-badge-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Оплата прошла",
+                    "variant": "badge",
+                    "color": "#15803d"
+                  },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "padding": "8px 16px",
+                    "background": "rgba(34,197,94,0.16)",
+                    "borderRadius": "9999px",
+                    "fontWeight": 600
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "text-success-title-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Чек отправлен клиенту",
+                    "variant": "heading",
+                    "color": "#166534"
+                  },
+                  "style": {
+                    "fontSize": "32px",
+                    "lineHeight": 1.1,
+                    "fontWeight": 700
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "text-success-description-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Можно оформить новый заказ или перейти к апселлам.",
+                    "variant": "body",
+                    "color": "rgba(22, 101, 52, 0.72)"
+                  },
+                  "style": {
+                    "fontSize": "16px"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "list-success-details-1758927807107",
+                  "type": "list",
+                  "properties": {
+                    "variant": "unordered",
+                    "spacing": 8,
+                    "items": {
+                      "value": [],
+                      "reference": "${state.details}"
+                    },
+                    "itemAlias": "detail"
+                  },
+                  "style": {
+                    "listStyleType": "none",
+                    "padding": 0,
+                    "margin": 0,
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "8px",
+                    "width": "100%"
+                  },
+                  "children": [
+                    {
+                      "id": "text-success-detail-item-1758927807107",
+                      "type": "text",
+                      "properties": {
+                        "content": {
+                          "value": "",
+                          "reference": "${detail}"
+                        },
+                        "variant": "body",
+                        "color": "rgba(15, 23, 42, 0.88)"
+                      },
+                      "style": {
+                        "width": "100%",
+                        "textAlign": "left"
+                      },
+                      "children": [],
+                      "position": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    }
+                  ],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "position": {
+                "x": 0,
+                "y": 0
+              }
             }
-          },
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px 16px',
-            background: 'rgba(34,197,94,0.16)',
-            color: '#15803d',
-            borderRadius: '9999px',
-            fontWeight: 600
-          }
+          ]
         },
-        {
-          id: 'success-title',
-          type: 'text',
-          parentId: 'success-wrapper',
-          props: {
-            variant: 'heading',
-            content: {
-              value: 'Чек отправлен клиенту'
-            }
+        "bottomBar": {
+          "id": "bottombar-success-1758927807107",
+          "type": "Section",
+          "properties": {
+            "slot": "bottomBar",
+            "spacing": 12,
+            "padding": 24,
+            "alignItems": "center",
+            "justifyContent": "flex-end",
+            "background": "transparent"
           },
-          style: {
-            fontSize: '32px',
-            lineHeight: 1.1,
-            color: '#166534'
-          }
-        },
-        {
-          id: 'success-description',
-          type: 'text',
-          parentId: 'success-wrapper',
-          props: {
-            variant: 'body',
-            content: {
-              value: 'Можно оформить новый заказ или перейти к апселлам.'
-            }
+          "style": {
+            "width": "100%",
+            "borderTop": "1px solid rgba(22, 101, 52, 0.12)",
+            "background": "transparent"
           },
-          style: {
-            color: 'rgba(22,101,52,0.72)'
-          }
+          "children": [
+            {
+              "id": "row-success-actions-1758927807107",
+              "type": "row",
+              "properties": {
+                "spacing": 12,
+                "padding": 0,
+                "alignItems": "center",
+                "justifyContent": "flex-end",
+                "background": "transparent"
+              },
+              "style": {
+                "width": "100%",
+                "background": "transparent"
+              },
+              "children": [
+                {
+                  "id": "button-success-restart-1758927807107",
+                  "type": "button",
+                  "properties": {
+                    "text": "Оформить новый заказ",
+                    "variant": "primary",
+                    "size": "medium",
+                    "event": "restart"
+                  },
+                  "style": {
+                    "height": "44px",
+                    "padding": "0 28px",
+                    "borderRadius": "12px",
+                    "background": "#22c55e",
+                    "color": "#ffffff",
+                    "fontWeight": 600,
+                    "boxShadow": "0 14px 28px rgba(34, 197, 94, 0.28)"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          ]
         }
-      ]
+      },
+      "references": {}
     },
-    'screen-cancelled': {
-      id: 'screen-cancelled',
-      name: 'Cancelled',
-      components: [
-        {
-          id: 'cancel-root',
-          type: 'screen',
-          children: ['cancel-wrapper'],
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100%',
-            background: 'linear-gradient(180deg, rgba(254,226,226,0.32) 0%, rgba(254,242,242,1) 100%)'
-          }
-        },
-        {
-          id: 'cancel-wrapper',
-          type: 'column',
-          parentId: 'cancel-root',
-          children: ['cancel-badge', 'cancel-title', 'cancel-description'],
-          props: {
-            spacing: 16,
-            padding: 32
+    "screen-cancelled": {
+      "id": "screen-cancelled-1758927807107",
+      "type": "Screen",
+      "name": "Cancelled",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "minHeight": "720px",
+        "backgroundColor": "linear-gradient(180deg, rgba(254,226,226,0.32) 0%, rgba(254,242,242,1) 100%)",
+        "borderRadius": "var(--screen-radius, 32px)",
+        "border": "1px solid rgba(190, 24, 93, 0.18)",
+        "boxShadow": "0 32px 60px rgba(127, 29, 29, 0.18)",
+        "padding": "0px",
+        "gap": "0px"
+      },
+      "sections": {
+        "body": {
+          "id": "body-cancelled-1758927807107",
+          "type": "Section",
+          "properties": {
+            "slot": "body",
+            "padding": 48,
+            "alignItems": "center",
+            "justifyContent": "center",
+            "background": "transparent"
           },
-          style: {
-            background: '#ffffff',
-            borderRadius: '32px',
-            boxShadow: '0px 32px 80px rgba(127,29,29,0.18)',
-            maxWidth: '440px',
-            textAlign: 'center'
-          }
-        },
-        {
-          id: 'cancel-badge',
-          type: 'text',
-          parentId: 'cancel-wrapper',
-          props: {
-            variant: 'badge',
-            content: {
-              value: 'Оплата отменена'
+          "style": {
+            "flex": "1 1 auto",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "background": "transparent"
+          },
+          "children": [
+            {
+              "id": "column-cancelled-main-1758927807107",
+              "type": "column",
+              "properties": {
+                "spacing": 16,
+                "padding": 40,
+                "alignItems": "center",
+                "justifyContent": "center",
+                "background": "#ffffff"
+              },
+              "style": {
+                "maxWidth": "480px",
+                "width": "100%",
+                "borderRadius": "32px",
+                "boxShadow": "0 32px 80px rgba(127, 29, 29, 0.18)",
+                "textAlign": "center",
+                "gap": "16px"
+              },
+              "children": [
+                {
+                  "id": "text-cancelled-badge-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Оплата отменена",
+                    "variant": "badge",
+                    "color": "#b91c1c"
+                  },
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "padding": "8px 16px",
+                    "background": "rgba(239,68,68,0.16)",
+                    "borderRadius": "9999px",
+                    "fontWeight": 600
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "text-cancelled-title-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Клиент передумал",
+                    "variant": "heading",
+                    "color": "#991b1b"
+                  },
+                  "style": {
+                    "fontSize": "32px",
+                    "lineHeight": 1.1,
+                    "fontWeight": 700
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "id": "text-cancelled-description-1758927807107",
+                  "type": "text",
+                  "properties": {
+                    "content": "Попробуйте предложить рассрочку или сопровождение менеджера.",
+                    "variant": "body",
+                    "color": "rgba(153, 27, 27, 0.72)"
+                  },
+                  "style": {
+                    "fontSize": "16px"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "position": {
+                "x": 0,
+                "y": 0
+              }
             }
-          },
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px 16px',
-            background: 'rgba(239,68,68,0.16)',
-            color: '#b91c1c',
-            borderRadius: '9999px',
-            fontWeight: 600
-          }
+          ]
         },
-        {
-          id: 'cancel-title',
-          type: 'text',
-          parentId: 'cancel-wrapper',
-          props: {
-            variant: 'heading',
-            content: {
-              value: 'Клиент передумал'
-            }
+        "bottomBar": {
+          "id": "bottombar-cancelled-1758927807107",
+          "type": "Section",
+          "properties": {
+            "slot": "bottomBar",
+            "spacing": 12,
+            "padding": 24,
+            "alignItems": "center",
+            "justifyContent": "flex-end",
+            "background": "transparent"
           },
-          style: {
-            fontSize: '32px',
-            lineHeight: 1.1,
-            color: '#991b1b'
-          }
-        },
-        {
-          id: 'cancel-description',
-          type: 'text',
-          parentId: 'cancel-wrapper',
-          props: {
-            variant: 'body',
-            content: {
-              value: 'Попробуйте предложить рассрочку или сопровождение менеджера.'
-            }
+          "style": {
+            "width": "100%",
+            "borderTop": "1px solid rgba(127, 29, 29, 0.12)",
+            "background": "transparent"
           },
-          style: {
-            color: 'rgba(153,27,27,0.72)'
-          }
+          "children": [
+            {
+              "id": "row-cancelled-actions-1758927807107",
+              "type": "row",
+              "properties": {
+                "spacing": 12,
+                "padding": 0,
+                "alignItems": "center",
+                "justifyContent": "flex-end",
+                "background": "transparent"
+              },
+              "style": {
+                "width": "100%",
+                "background": "transparent"
+              },
+              "children": [
+                {
+                  "id": "button-cancelled-resume-1758927807107",
+                  "type": "button",
+                  "properties": {
+                    "text": "Вернуться к оплате",
+                    "variant": "primary",
+                    "size": "medium",
+                    "event": "resume"
+                  },
+                  "style": {
+                    "height": "44px",
+                    "padding": "0 28px",
+                    "borderRadius": "12px",
+                    "background": "#dc2626",
+                    "color": "#ffffff",
+                    "fontWeight": 600,
+                    "boxShadow": "0 14px 28px rgba(220, 38, 38, 0.28)"
+                  },
+                  "children": [],
+                  "position": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "position": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          ]
         }
-      ]
+      },
+      "references": {}
     }
   }
-};
-
-*/
+}

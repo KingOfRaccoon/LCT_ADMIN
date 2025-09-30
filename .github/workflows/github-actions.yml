@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -23,22 +23,21 @@ jobs:
       - name: Build React app
         run: npm run build
 
-      - name: Upload artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: react-app
-          path: ./build/**   
-          if-no-files-found: error
+          name: react-build
+          path: build/
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifact
+      - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: react-app
-          path: ./react-build 
+          name: react-build
+          path: build/
 
       - name: Deploy via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -46,8 +45,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: './react-build/*'
-          target: '/var/www/myapp'
+          source: 'build/*'
+          target: '/var/www/html'
+          strip_components: 1
 
       - name: Restart web server
         uses: appleboy/ssh-action@v1.0.3
@@ -57,4 +57,4 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             sudo systemctl restart nginx
-            echo "React app deployed and web server restarted successfully!"
+            echo "React application deployed successfully!"

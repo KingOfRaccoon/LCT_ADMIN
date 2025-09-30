@@ -6,6 +6,7 @@ import ProductOverview from './pages/ProductOverview/ProductOverview';
 import ScreenEditor from './pages/ScreenEditor/ScreenEditor';
 import ScreenBuilder from './pages/ScreenBuilder/ScreenBuilder';
 import SandboxPage from './pages/Sandbox/SandboxPage';
+import PreviewPage from './pages/Preview/PreviewPage';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 
@@ -22,6 +23,9 @@ function App() {
 
               {/* Sandbox */}
               <Route path="/sandbox" element={<SandboxPage />} />
+
+              {/* Preview */}
+              <Route path="/preview" element={<PreviewPage />} />
               
               {/* 1. Product List Page */}
               <Route path="/products" element={<ProductList />} />

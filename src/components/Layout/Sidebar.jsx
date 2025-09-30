@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { 
-  Package, 
-  Monitor, 
-  Edit3, 
-  Settings, 
-  Database,
+import {
+  Package,
+  Monitor,
+  Edit3,
+  Settings,
   Activity,
   ChevronRight,
-  FlaskConical
+  FlaskConical,
+  PlayCircle
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
 import './Sidebar.css';
@@ -42,6 +42,12 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
           icon: FlaskConical,
           path: '/sandbox',
           active: currentPath === '/sandbox'
+        },
+        {
+          label: 'Preview',
+          icon: PlayCircle,
+          path: '/preview',
+          active: currentPath === '/preview'
         }
       ]
     }

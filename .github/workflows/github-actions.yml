@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0'
+          node-version: '18'
           cache: 'npm'
 
       - name: Install dependencies
@@ -37,7 +37,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: react-build
-          path: build/
 
       - name: Deploy via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -45,9 +44,8 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: 'build/*'
+          source: './*'
           target: '/var/www/html'
-          strip_components: 1
 
       - name: Restart web server
         uses: appleboy/ssh-action@v1.0.3

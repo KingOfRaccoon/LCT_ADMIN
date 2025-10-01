@@ -1,34 +1,28 @@
-name: React CI/CD with SCP
-
+name: React CI/CD with SCP and Docker
 on:
   push:
     branches:
       - master
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0' # можно поменять версию под ваш проект
+          node-version: '22.12.0'
           cache: 'npm'
-
       - name: Install dependencies
         run: npm install
-
       - name: Build React app
         run: npm run build
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: react-app
-          path: dist # стандартная папка билда React
-
+          path: dist
+  
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -37,22 +31,49 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: react-app
-
-      - name: Deploy via SCP
+      
+      - name: Deploy React via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: './*'
-          target: '/var/www/myapp' # Путь до web-директории на сервере
-
-      - name: Restart web server
+          target: '/var/www/sandkittens-frontend'
+      
+      - name: Deploy Backend and Restart Services
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            sudo systemctl restart nginx # или apache2, если используется Apache
-            echo "React app deployed and web server restarted successfully!"
+            echo "Setting permissions for React app..."
+            sudo chown -R www-data:www-data /var/www/sandkittens-frontend
+            sudo chmod -R 755 /var/www/sandkittens-frontend
+            
+            echo "Navigating to backend directory..."
+            cd /opt/lct_efs/deployments
+            
+            echo "Pulling latest backend changes..."
+            git pull origin release/0.0.1
+            
+            echo "Stopping existing containers..."
+            docker-compose down
+            
+            echo "Building and starting Docker containers..."
+            docker-compose up -d --build
+            
+            echo "Waiting for services to start..."
+            sleep 10
+            
+            echo "Checking container status..."
+            docker-compose ps
+            
+            echo "Restarting nginx..."
+            sudo systemctl restart nginx
+            
+            echo "Deployment completed successfully!"
+            echo "Frontend: https://sandkittens.me"
+            echo "API: https://sandkittens.me/api/"
+            echo "Mongo Admin: https://sandkittens.me/mongo-admin/"

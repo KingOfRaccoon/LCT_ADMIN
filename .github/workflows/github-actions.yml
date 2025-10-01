@@ -77,3 +77,4 @@ jobs:
             echo "Frontend: https://sandkittens.me"
             echo "API: https://sandkittens.me/api/"
             echo "Mongo Admin: https://sandkittens.me/mongo-admin/"
+            

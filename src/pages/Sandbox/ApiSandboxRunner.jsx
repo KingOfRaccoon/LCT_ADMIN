@@ -117,7 +117,7 @@ const ApiSandboxRunner = ({ initialData, onExit }) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const handleEvent = useCallback(async (eventName) => {
+  const handleEvent = useCallback(async (eventName, eventParams = {}) => {
     if (!eventName || pending) {
       return;
     }
@@ -125,6 +125,20 @@ const ApiSandboxRunner = ({ initialData, onExit }) => {
     setError(null);
     try {
       const params = new URLSearchParams({ event: eventName });
+      
+      // Add event-specific parameters first
+      Object.entries(eventParams).forEach(([key, value]) => {
+        if (value === null || value === undefined) {
+          return;
+        }
+        const stringValue = String(value).trim();
+        if (stringValue.length === 0) {
+          return;
+        }
+        params.append(key, stringValue);
+      });
+      
+      // Then add form values
       Object.entries(formValues).forEach(([key, value]) => {
         if (value === null || value === undefined) {
           return;
@@ -145,7 +159,7 @@ const ApiSandboxRunner = ({ initialData, onExit }) => {
         id: `${Date.now()}-${eventName}`,
         event: eventName,
         timestamp: new Date().toISOString(),
-        inputs: { ...formValues },
+        inputs: { ...formValues, ...eventParams },
         screenId: data?.screen?.id ?? null
       });
     } catch (err) {

@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   applyContextPatch,
   cloneContext,
@@ -10,6 +10,7 @@ import {
 import SandboxScreenRenderer from './SandboxScreenRenderer';
 import ApiSandboxRunner from './ApiSandboxRunner';
 import ecommerceDashboard from './data/ecommerceDashboard.json';
+import avitoDemo from './data/avitoDemo.json';
 import {
   ArrowRight,
   GitBranch,
@@ -19,6 +20,9 @@ import {
   PlugZap
 } from 'lucide-react';
 import { useAnalytics } from '../../services/analytics';
+import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
+import { loadWorkflow, parseWorkflowUrlParams } from '../../utils/workflowApi';
+import toast from 'react-hot-toast';
 import './SandboxPage.css';
 
 const isPlainObject = (value) => (
@@ -170,12 +174,74 @@ const getInitialNodeId = (product) => (
 
 const SandboxPage = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { trackScreenView, finalizeScreenTiming } = useAnalytics();
+  
+  // Поддержка legacy способа передачи данных через location.state
   const runtimeProduct = location.state?.product;
   const runtimeSchemas = location.state?.variableSchemas;
+  
+  // Поддержка загрузки workflow через URL параметры
+  const { clientSessionId, clientWorkflowId } = parseWorkflowUrlParams(searchParams);
+  
+  // Состояние для workflow загруженного через API
+  const [workflowData, setWorkflowData] = useState(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [workflowError, setWorkflowError] = useState(null);
+  
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
   const [apiData, setApiData] = useState(null);
   const [apiError, setApiError] = useState(null);
+  
+  // Загрузка workflow через API при наличии URL параметров
+  useEffect(() => {
+    if (!clientSessionId || !clientWorkflowId) {
+      return;
+    }
+    
+    let cancelled = false;
+    
+    const fetchWorkflow = async () => {
+      setWorkflowLoading(true);
+      setWorkflowError(null);
+      
+      try {
+        const workflow = await loadWorkflow(clientSessionId, clientWorkflowId);
+        
+        if (!cancelled) {
+          setWorkflowData({
+            id: workflow.metadata.id,
+            name: workflow.metadata.name,
+            version: workflow.metadata.version,
+            nodes: workflow.nodes,
+            edges: workflow.edges,
+            screens: workflow.screens,
+            initialContext: workflow.initialContext,
+            variableSchemas: workflow.variableSchemas,
+          });
+          setApiMode('disabled'); // Отключаем API mode при загрузке workflow
+          toast.success(`Workflow "${workflow.metadata.name}" загружен успешно!`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const errorMessage = error instanceof Error ? error.message : 'Не удалось загрузить workflow';
+          setWorkflowError(errorMessage);
+          toast.error(`Ошибка загрузки workflow: ${errorMessage}`);
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkflowLoading(false);
+        }
+      }
+    };
+    
+    fetchWorkflow();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [clientSessionId, clientWorkflowId]);
+  
   useEffect(() => {
     if (runtimeProduct && apiMode !== 'disabled') {
       setApiMode('disabled');
@@ -221,14 +287,15 @@ const SandboxPage = () => {
   }, []);
 
   const handleRetryApi = useCallback(() => {
-    if (runtimeProduct) {
+    if (runtimeProduct || workflowData) {
       return;
     }
     setApiError(null);
     setApiMode('checking');
-  }, [runtimeProduct]);
+  }, [runtimeProduct, workflowData]);
 
-  const product = runtimeProduct || ecommerceDashboard;
+  // Приоритет: workflowData > runtimeProduct > avitoDemo
+  const product = workflowData || runtimeProduct || avitoDemo;
   const nodesById = useMemo(() => {
     const map = new Map();
     (product?.nodes ?? []).forEach((node) => {
@@ -238,10 +305,10 @@ const SandboxPage = () => {
     });
     return map;
   }, [product]);
-  const isOfflineMode = Boolean(runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
+  const isOfflineMode = Boolean(workflowData || runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
   const variableSchemas = useMemo(
-    () => runtimeSchemas || product.variableSchemas || {},
-    [product, runtimeSchemas]
+    () => workflowData?.variableSchemas || runtimeSchemas || product.variableSchemas || {},
+    [product, runtimeSchemas, workflowData]
   );
   const getNodeById = useCallback((nodeId) => nodesById.get(nodeId) ?? null, [nodesById]);
   const initialNodeId = useMemo(() => getInitialNodeId(product), [product]);
@@ -577,19 +644,29 @@ const SandboxPage = () => {
 
   const handleNodeEvent = useCallback((eventName) => {
     if (!eventName || !currentNode) {
+      console.log('[SandboxPage] handleNodeEvent: missing eventName or currentNode', { eventName, currentNode: currentNode?.id });
       return;
     }
 
     const normalized = eventName.trim();
     if (!normalized) {
+      console.log('[SandboxPage] handleNodeEvent: empty eventName after trim');
       return;
     }
+
+    console.log('[SandboxPage] handleNodeEvent:', {
+      eventName: normalized,
+      nodeId: currentNode.id,
+      availableEdges: currentNode.edges?.map(e => ({ id: e.id, event: e.event, target: e.target }))
+    });
 
     const edge = (currentNode.edges ?? []).find((candidate) => candidate && candidate.event === normalized);
     if (!edge) {
+      console.warn('[SandboxPage] No matching edge found for event:', normalized);
       return;
     }
 
+    console.log('[SandboxPage] Found matching edge:', edge.id, '-> target:', edge.target);
     handleEdgeRun(edge);
   }, [currentNode, handleEdgeRun]);
 
@@ -626,6 +703,39 @@ const SandboxPage = () => {
         initialData={apiData}
         onExit={handleDisableApi}
       />
+    );
+  }
+
+  // Отображаем загрузчик при загрузке workflow
+  if (workflowLoading) {
+    return (
+      <div className="sandbox-page">
+        <div className="sandbox-loading">
+          <div className="sandbox-loading-spinner"></div>
+          <h2>Загрузка workflow...</h2>
+          <p>Пожалуйста, подождите</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Отображаем ошибку при неудачной загрузке workflow
+  if (workflowError) {
+    return (
+      <div className="sandbox-page">
+        <div className="sandbox-error">
+          <h2>Ошибка загрузки workflow</h2>
+          <p>{workflowError}</p>
+          <button 
+            type="button" 
+            className="sandbox-reset"
+            onClick={() => window.location.reload()}
+          >
+            <RotateCcw size={16} />
+            Попробовать снова
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -796,10 +906,31 @@ const SandboxPage = () => {
             <h1>{product.name}</h1>
             <p>{product.description}</p>
           </div>
-          <button type="button" className="sandbox-reset" onClick={handleReset}>
-            <RotateCcw size={16} />
-            Сбросить сценарий
-          </button>
+          <div className="sandbox-header-actions">
+            {/* Кнопка экспорта workflow */}
+            <WorkflowExportButton
+              graphData={{
+                nodes: product.nodes || [],
+                edges: product.nodes?.flatMap(node => 
+                  (node.edges || []).map(edge => ({
+                    id: edge.id,
+                    source: node.id,
+                    target: edge.target,
+                    data: edge.data || {}
+                  }))
+                ) || []
+              }}
+              initialContext={contextState || product.initialContext || {}}
+              productId={product.id || product.slug || product.name || 'sandbox'}
+              label="Export"
+              size={16}
+            />
+            
+            <button type="button" className="sandbox-reset" onClick={handleReset}>
+              <RotateCcw size={16} />
+              Сбросить сценарий
+            </button>
+          </div>
         </div>
 
         <div className="sandbox-status">

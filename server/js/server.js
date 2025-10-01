@@ -18,6 +18,8 @@ const ROOT_DIR = path.resolve(__dirname, '..', '..');
 const PRESET_NAME = process.env.SANDBOX_PRESET || 'avitoDemo';
 const DATASET_PATH = path.resolve(ROOT_DIR, `src/pages/Sandbox/data/${PRESET_NAME}.json`);
 
+console.log(`[sandbox-js] Loading preset: ${PRESET_NAME} from ${DATASET_PATH}`);
+
 const deepClone = (value) => {
   if (typeof structuredClone === 'function') {
     return structuredClone(value);
@@ -65,15 +67,20 @@ const EDGE_REGISTRY = new Map();
   });
 });
 
-const DEFAULT_INPUTS = { email: '' };
-
-const EVENT_RULES = {
-  checkemail: { sourceNode: 'email-entry', edgeId: 'edge-email-submit', keepInputs: true },
-  retryfromsuccess: { sourceNode: 'email-valid', edgeId: 'edge-valid-retry', keepInputs: false },
-  retryfromerror: { sourceNode: 'email-invalid', edgeId: 'edge-invalid-retry', keepInputs: false }
+// Find the start node dynamically
+const findStartNode = () => {
+  for (const node of NODE_REGISTRY.values()) {
+    if (node.start === true) {
+      return node.id;
+    }
+  }
+  // Fallback to first node if no start node marked
+  return NODE_REGISTRY.size > 0 ? NODE_REGISTRY.keys().next().value : null;
 };
 
-const BUTTON_EVENT_INJECTIONS = {};
+const START_NODE_ID = findStartNode();
+
+const DEFAULT_INPUTS = { email: '' };
 
 const FETCH_TIMEOUT_MS = Number(process.env.SANDBOX_FETCH_TIMEOUT ?? 2000);
 const PREFETCH_CACHE_TTL = Number(process.env.SANDBOX_PREFETCH_TTL ?? 60000);
@@ -291,6 +298,39 @@ const resolveConditionEdge = (node, context) => {
   }
 
   const edges = Array.isArray(node.edges) ? node.edges : [];
+  
+  // Special case: random selection for adding recommended items
+  if (node.id === 'action-add-recommended' && edges.length > 0) {
+    const randomIndex = Math.floor(Math.random() * edges.length);
+    console.log(`[sandbox-js] Random selection for ${node.id}: edge ${randomIndex + 1}/${edges.length} (${edges[randomIndex].id})`);
+    return edges[randomIndex];
+  }
+  
+  // Special case: modify-cart-item actions (increment/decrement)
+  if (node.data?.actionType === 'modify-cart-item' && edges.length > 0) {
+    const edge = edges[0]; // Используем первый (и единственный) edge
+    const operation = node.data.operation; // 'increment' или 'decrement'
+    const config = node.data.config || {};
+    
+    // Получаем itemId из query parameters (переданный через inputs)
+    const itemIdParam = config.itemIdParam || 'itemId';
+    const itemId = context._queryParams?.[itemIdParam];
+    
+    if (!itemId) {
+      console.warn(`[sandbox-js] modify-cart-item: missing ${itemIdParam} parameter`);
+      return edge;
+    }
+    
+    // Применяем трансформацию и создаём динамический contextPatch
+    const patch = applyCartItemModification(context, itemId, operation, config);
+    
+    // Возвращаем edge с обновлённым contextPatch
+    return {
+      ...edge,
+      contextPatch: patch
+    };
+  }
+  
   const config = node.data?.config ?? {};
   const conditions = Array.isArray(config.conditions) ? config.conditions : [];
 
@@ -319,6 +359,76 @@ const resolveConditionEdge = (node, context) => {
   return null;
 };
 
+// Вспомогательная функция для модификации товаров в корзине
+const applyCartItemModification = (context, itemId, operation, config) => {
+  const patch = {};
+  const minQty = config.minQuantity ?? 1;
+  const maxQty = config.maxQuantity ?? 99;
+  const arrays = config.arrays || ['cart.pearStoreItems', 'cart.technoStoreItems'];
+  
+  // Ищем товар во всех указанных массивах
+  for (const arrayPath of arrays) {
+    const items = getContextValue(context, arrayPath) ?? [];
+    const itemIndex = items.findIndex(item => item?.id === itemId);
+    
+    if (itemIndex !== -1) {
+      const item = items[itemIndex];
+      const currentQty = item?.quantity ?? 1;
+      
+      // Вычисляем новое количество в зависимости от операции
+      let newQty = currentQty;
+      if (operation === 'increment') {
+        newQty = Math.min(currentQty + 1, maxQty);
+      } else if (operation === 'decrement') {
+        newQty = Math.max(currentQty - 1, minQty);
+      }
+      
+      // Устанавливаем новое количество
+      patch[`${arrayPath}.${itemIndex}.quantity`] = newQty;
+      
+      // Пересчитываем totalPrice и selectedCount если указано в конфиге
+      if (Array.isArray(config.recalculate) && config.recalculate.length > 0) {
+        const totals = calculateCartTotals(context, arrays, arrayPath, itemIndex, newQty);
+        
+        config.recalculate.forEach(field => {
+          if (field === 'cart.totalPrice' && totals.totalPrice !== undefined) {
+            patch['cart.totalPrice'] = totals.totalPrice;
+          } else if (field === 'cart.selectedCount' && totals.selectedCount !== undefined) {
+            patch['cart.selectedCount'] = totals.selectedCount;
+          }
+        });
+      }
+      
+      console.log(`[sandbox-js] modify-cart-item: ${operation} ${itemId} → qty=${newQty}, total=${patch['cart.totalPrice']}, count=${patch['cart.selectedCount']}`);
+      return patch;
+    }
+  }
+  
+  console.warn(`[sandbox-js] modify-cart-item: item ${itemId} not found`);
+  return patch;
+};
+
+// Вспомогательная функция для расчёта итогов корзины
+const calculateCartTotals = (context, arrayPaths, modifiedArrayPath, modifiedIndex, newQty) => {
+  let totalPrice = 0;
+  let selectedCount = 0;
+  
+  arrayPaths.forEach(arrayPath => {
+    const items = getContextValue(context, arrayPath) ?? [];
+    items.forEach((item, idx) => {
+      const qty = (arrayPath === modifiedArrayPath && idx === modifiedIndex) 
+        ? newQty 
+        : (item?.quantity ?? 1);
+      const price = item?.price ?? 0;
+      
+      totalPrice += qty * price;
+      selectedCount += qty;
+    });
+  });
+  
+  return { totalPrice, selectedCount };
+};
+
 const runEdgeSequence = (edgeId, sourceNodeId, startingContext) => {
   if (!edgeId) {
     return { context: startingContext, finalNodeId: sourceNodeId };
@@ -326,12 +436,16 @@ const runEdgeSequence = (edgeId, sourceNodeId, startingContext) => {
 
   let context = startingContext;
   let currentEdgeId = edgeId;
+  let currentEdge = null; // Храним сам edge, не только ID
   let currentSourceNodeId = sourceNodeId;
   let guard = 0;
   let lastTargetNodeId = sourceNodeId;
 
   while (currentEdgeId) {
-    const edge = EDGE_REGISTRY.get(currentEdgeId);
+    // Используем уже найденный edge или берём из registry
+    const edge = currentEdge || EDGE_REGISTRY.get(currentEdgeId);
+    currentEdge = null; // Сбрасываем для следующей итерации
+    
     if (!edge) {
       throw new HttpError(500, `Edge '${currentEdgeId}' is not defined in sandbox flow`);
     }
@@ -340,6 +454,13 @@ const runEdgeSequence = (edgeId, sourceNodeId, startingContext) => {
     }
 
     context = applyContextPatch(context, edge.contextPatch ?? {}, context);
+    
+    // DEBUG: Проверяем, применился ли патч
+    if (Object.keys(edge.contextPatch ?? {}).length > 0) {
+      console.log(`[sandbox-js] Applied patch from edge ${edge.id}:`, JSON.stringify(edge.contextPatch, null, 2));
+      console.log(`[sandbox-js] Context after patch - item-1 qty:`, getContextValue(context, 'cart.pearStoreItems.0.quantity'));
+    }
+    
     lastTargetNodeId = edge.target ?? lastTargetNodeId;
 
     const targetNode = edge.target ? NODE_REGISTRY.get(edge.target) : undefined;
@@ -363,7 +484,9 @@ const runEdgeSequence = (edgeId, sourceNodeId, startingContext) => {
       };
     }
 
+    // Сохраняем и ID, и сам edge для следующей итерации
     currentEdgeId = nextEdge.id;
+    currentEdge = nextEdge; // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: используем модифицированный edge
     currentSourceNodeId = targetNode.id;
   }
 
@@ -424,82 +547,13 @@ const resolveScreenId = (nodeId) => {
   return screenId;
 };
 
-const injectButtonEvents = (screenId, screen) => {
-  const injections = BUTTON_EVENT_INJECTIONS[screenId];
-  if (!injections || !screen || typeof screen !== 'object') {
-    return;
-  }
-
-  const componentMap = new Map();
-
-  const registerComponent = (component) => {
-    if (!component || typeof component !== 'object') {
-      return;
-    }
-    if (component.id && !componentMap.has(component.id)) {
-      componentMap.set(component.id, component);
-    }
-    const children = Array.isArray(component.children) ? component.children : [];
-    children.forEach((child) => {
-      if (child && typeof child === 'object') {
-        registerComponent(child);
-        return;
-      }
-      if (typeof child === 'string' && componentMap.has(child)) {
-        registerComponent(componentMap.get(child));
-      }
-    });
-  };
-
-  const baseComponents = Array.isArray(screen.components) ? screen.components : [];
-  baseComponents.forEach((component) => {
-    if (component && typeof component === 'object' && component.id) {
-      componentMap.set(component.id, component);
-    }
-  });
-  baseComponents.forEach(registerComponent);
-
-  if (screen.sections && typeof screen.sections === 'object') {
-    Object.values(screen.sections).forEach(registerComponent);
-  }
-
-  Object.entries(injections).forEach(([componentId, eventName]) => {
-    if (!eventName) {
-      return;
-    }
-    const component = componentMap.get(componentId);
-    if (!component || typeof component !== 'object') {
-      return;
-    }
-
-    if (component.props && typeof component.props === 'object') {
-      component.props.event = eventName;
-    }
-    if (component.properties && typeof component.properties === 'object') {
-      component.properties.event = eventName;
-    } else if (!component.props || typeof component.props !== 'object') {
-      component.properties = { event: eventName };
-    }
-    component.event = eventName;
-  });
-};
-
 const getScreenPayload = (screenId) => {
   const screen = SCREEN_REGISTRY[screenId];
   if (!screen || typeof screen !== 'object') {
     throw new HttpError(500, `Unknown screen '${screenId}' in sandbox flow`);
   }
-  const screenCopy = deepClone(screen);
-  injectButtonEvents(screenId, screenCopy);
-  return screenCopy;
-};
-
-const buildDynamicPatch = (event, inputs) => {
-  const patch = {};
-  if (typeof inputs.email === 'string') {
-    patch['inputs.email'] = inputs.email.trim();
-  }
-  return patch;
+  // События уже описаны в компонентах JSON, инъекция не требуется
+  return deepClone(screen);
 };
 
 const applyPatchToContext = (baseContext, patch) => {
@@ -559,16 +613,22 @@ const makeStateSnapshot = (context, overrides, inputs) => {
 };
 
 const buildApiContext = (coreContext, inputs, stateOverrides) => {
-  const payload = {
-    ui: deepClone(coreContext.ui ?? {}),
-    data: deepClone(coreContext.data ?? {}),
-    inputs: { ...DEFAULT_INPUTS, ...(inputs ?? {}) }
-  };
-  if (typeof payload.inputs.email === 'string') {
-    payload.inputs.email = payload.inputs.email.trim();
+  if (PRESET_NAME === 'ecommerceDashboard') {
+    // ecommerceDashboard specific structure
+    const payload = {
+      ui: deepClone(coreContext.ui ?? {}),
+      data: deepClone(coreContext.data ?? {}),
+      inputs: { ...DEFAULT_INPUTS, ...(inputs ?? {}) }
+    };
+    if (typeof payload.inputs.email === 'string') {
+      payload.inputs.email = payload.inputs.email.trim();
+    }
+    payload.state = makeStateSnapshot(payload, stateOverrides ?? {}, payload.inputs);
+    return payload;
   }
-  payload.state = makeStateSnapshot(payload, stateOverrides ?? {}, payload.inputs);
-  return payload;
+  
+  // For other presets (avitoDemo), preserve full context
+  return deepClone(coreContext);
 };
 
 const makeScreenResponse = (screenId, context) => ({
@@ -596,9 +656,12 @@ const extractFormValues = (query) => {
 };
 
 const buildStartResponse = async () => {
+  if (!START_NODE_ID) {
+    throw new HttpError(500, 'No start node found in dataset');
+  }
   const core = await buildBaseContextWithPrefetch();
-  const context = buildApiContext(core, DEFAULT_INPUTS, stateOverridesForNode('email-entry'));
-  const screenId = resolveScreenId('email-entry');
+  const context = buildApiContext(core, DEFAULT_INPUTS, stateOverridesForNode(START_NODE_ID));
+  const screenId = resolveScreenId(START_NODE_ID);
   return makeScreenResponse(screenId, context);
 };
 
@@ -607,8 +670,20 @@ const handleEvent = async (eventName, query) => {
     throw new HttpError(400, "Parameter 'event' is required");
   }
   const normalized = eventName.trim().toLowerCase();
-  const rule = EVENT_RULES[normalized];
-  if (!rule) {
+  
+  // Ищем ребро с событием в EDGE_REGISTRY (любой source, который имеет event)
+  let matchingEdge = null;
+  let sourceNodeId = null;
+  
+  for (const [edgeId, edge] of EDGE_REGISTRY.entries()) {
+    if (edge.event && edge.event.toLowerCase() === normalized) {
+      matchingEdge = edge;
+      sourceNodeId = edge.source || START_NODE_ID;
+      break;
+    }
+  }
+  
+  if (!matchingEdge) {
     throw new HttpError(404, `Unknown event '${eventName}'`);
   }
 
@@ -618,11 +693,20 @@ const handleEvent = async (eventName, query) => {
     inputs.email = inputs.email.trim();
   }
 
-  const dynamicPatch = buildDynamicPatch(normalized, inputs);
   const baseContext = await buildBaseContextWithPrefetch();
-  const contextWithInputs = applyPatchToContext(baseContext, dynamicPatch);
+  
+  // Добавляем query params в контекст для доступа в action-узлах
+  const contextWithParams = {
+    ...baseContext,
+    _queryParams: formValues
+  };
+  
+  // Для ecommerceDashboard добавляем inputs напрямую в контекст
+  if (PRESET_NAME === 'ecommerceDashboard') {
+    contextWithParams.inputs = { ...DEFAULT_INPUTS, ...inputs };
+  }
 
-  const edgeResult = runEdgeSequence(rule.edgeId, rule.sourceNode, contextWithInputs);
+  const edgeResult = runEdgeSequence(matchingEdge.id, sourceNodeId, contextWithParams);
   const finalNodeId = edgeResult.finalNodeId;
   let contextAfterFlow = edgeResult.context;
 
@@ -635,10 +719,15 @@ const handleEvent = async (eventName, query) => {
     throw new HttpError(500, `Event '${eventName}' did not resolve to a target node`);
   }
 
-  const keepInputs = rule.keepInputs ?? true;
+  const keepInputs = matchingEdge.keepInputs ?? true;
   const inputsForContext = keepInputs ? inputs : deepClone(DEFAULT_INPUTS);
   const screenId = resolveScreenId(finalNodeId);
-  const context = buildApiContext(contextAfterFlow, inputsForContext, stateOverridesForNode(finalNodeId));
+  
+  // Удаляем внутренние служебные поля перед отправкой
+  const cleanContext = { ...contextAfterFlow };
+  delete cleanContext._queryParams;
+  
+  const context = buildApiContext(cleanContext, inputsForContext, stateOverridesForNode(finalNodeId));
   return makeScreenResponse(screenId, context);
 };
 

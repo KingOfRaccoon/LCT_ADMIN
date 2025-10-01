@@ -48,6 +48,7 @@ import {
   Activity,
   Database,
   GitBranch,
+  Send,
   CheckCircle,
   AlertCircle,
   Trash2,
@@ -58,6 +59,7 @@ import '@xyflow/react/dist/style.css';
 import './ScreenEditor.css';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import { useVirtualContext } from '../../context/VirtualContext';
+import { useWorkflowApi } from '../../hooks/useWorkflowApi';
 import dagre from 'dagre';
 import defaultGraphTemplate from '../../data/defaultGraphTemplate.json';
 
@@ -677,6 +679,9 @@ const edgeTypes = {
 const ScreenEditor = () => {
   const { productId, screenId } = useParams();
   const navigate = useNavigate();
+  
+  // Workflow API hook
+  const workflowApi = useWorkflowApi();
 
   console.log('[DEBUG] ScreenEditor render start, screenId=', screenId);
 
@@ -689,6 +694,7 @@ const ScreenEditor = () => {
     variableSchemas,
     setVariableSchemas,
     setGraphData,
+    graphData,
     screens,
     setScreens,
     addScreen,
@@ -1547,13 +1553,45 @@ const ScreenEditor = () => {
     configChangeRef.current = handleNodeConfigChange;
   }, [handleNodeConfigChange]);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Используем ref для хранения флага инициализации
+  const graphInitializedRef = useRef(false);
 
+  useEffect(() => {
+    // Загружаем граф только один раз при монтировании или смене screenId
+    if (graphInitializedRef.current) {
+      return;
+    }
+
+    let cancelled = false;
 
     const loadGraphFromJson = async () => {
       try {
-        // Импортируем дефолтный граф из JSON-файла
+        // Сначала проверяем, есть ли данные в VirtualContext (например, из avitoDemo)
+        if (graphData && graphData.nodes && graphData.nodes.length > 0) {
+          console.log('[ScreenEditor] Loading graph from VirtualContext.graphData', graphData);
+          
+          const storedNodes = Array.isArray(graphData.nodes) ? graphData.nodes : [];
+          const storedEdges = Array.isArray(graphData.edges) ? graphData.edges : [];
+
+          const hydratedNodes = hydrateGraphNodes(storedNodes, {
+            onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
+            onConfigChange: configChangeRef.current ?? handleNodeConfigChange,
+            onExecute: handleNodeExecute
+          });
+
+          if (!cancelled) {
+            setNodes(hydratedNodes);
+            setEdges(storedEdges);
+            setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
+            setHistoryIndex(0);
+            graphInitializedRef.current = true;
+            toast.success('Граф загружен из продукта');
+          }
+          return;
+        }
+
+        // Если нет данных в VirtualContext, загружаем дефолтный граф из JSON-файла
+        console.log('[ScreenEditor] Loading default graph from JSON file');
         const graphJson = await import('../../data/defaultGraphTemplate.json');
         const storedNodes = Array.isArray(graphJson.nodes) ? graphJson.nodes : [];
         const storedEdges = Array.isArray(graphJson.edges) ? graphJson.edges : [];
@@ -1569,6 +1607,7 @@ const ScreenEditor = () => {
           setEdges(storedEdges);
           setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
           setHistoryIndex(0);
+          graphInitializedRef.current = true;
           if (graphJson.variableSchemas && typeof graphJson.variableSchemas === 'object') {
             setVariableSchemas(graphJson.variableSchemas);
           }
@@ -1582,6 +1621,7 @@ const ScreenEditor = () => {
           setEdges(layoutedEdges);
           setHistory([{ nodes: layoutedNodes, edges: layoutedEdges }]);
           setHistoryIndex(0);
+          graphInitializedRef.current = true;
         }
       }
     };
@@ -1591,6 +1631,11 @@ const ScreenEditor = () => {
     return () => {
       cancelled = true;
     };
+  }, [screenId]);
+
+  // Сбрасываем флаг при смене screenId
+  useEffect(() => {
+    graphInitializedRef.current = false;
   }, [screenId]);
 
   const addNewNode = useCallback((nodeType) => {
@@ -1792,6 +1837,38 @@ const ScreenEditor = () => {
     toast.success('Flow exported successfully!');
   }, [nodes, edges, variablesList, currentScreen]);
 
+  // Export to Workflow Server
+  const exportToWorkflowServer = useCallback(async () => {
+    try {
+      const graphData = { nodes, edges };
+      const initialContext = Object.entries(variables).reduce((acc, [key, val]) => {
+        acc[key] = val.value;
+        return acc;
+      }, {});
+
+      const response = await workflowApi.exportWorkflow(graphData, initialContext, {
+        productId,
+        onSuccess: (res) => {
+          toast.success(
+            `Workflow сохранен!\nID: ${res.wf_description_id}`,
+            { duration: 5000 }
+          );
+          console.log('Workflow saved:', res);
+        },
+        onError: (error) => {
+          toast.error(
+            `Ошибка экспорта: ${error.message}`,
+            { duration: 5000 }
+          );
+        }
+      });
+
+      return response;
+    } catch (error) {
+      console.error('Failed to export workflow:', error);
+    }
+  }, [nodes, edges, variables, workflowApi, productId]);
+
   const saveFlow = useCallback(async () => {
     
     if (!screenId) {
@@ -1941,6 +2018,10 @@ const ScreenEditor = () => {
           <button className="btn btn-ghost" onClick={exportFlow}>
             <Download size={18} />
             Export
+          </button>
+          <button className="btn btn-ghost" onClick={exportToWorkflowServer}>
+            <Send size={18} />
+            Export to Server
           </button>
           <button
             className="btn btn-primary"

@@ -17,6 +17,7 @@ import {
   Database
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
+import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
 import toast from 'react-hot-toast';
 import './ScreenBuilder.css';
 import { resolveWidgetStyles } from '../../styles/resolveWidgetStyles.js';
@@ -2799,6 +2800,32 @@ const ScreenBuilder = () => {
           </div>
 
           <div className="header-actions">
+            {/* Кнопка экспорта workflow */}
+            <WorkflowExportButton
+              graphData={{
+                nodes: [
+                  {
+                    id: screenId || 'built-screen',
+                    type: 'screen',
+                    data: {
+                      label: currentScreen?.name || 'Built Screen',
+                      screenId: screenId,
+                      start: true,
+                      final: true,
+                      layout: {
+                        components: components
+                      }
+                    }
+                  }
+                ],
+                edges: []
+              }}
+              initialContext={variables || {}}
+              productId={productId}
+              label="Export Workflow"
+              size={16}
+            />
+            
             <button 
               className="btn btn-ghost"
               onClick={() => setPreviewMode(!previewMode)}

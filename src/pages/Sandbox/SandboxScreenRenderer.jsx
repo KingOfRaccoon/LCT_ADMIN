@@ -334,13 +334,32 @@ const SandboxScreenRenderer = ({
 
       case 'button': {
         const rawText = resolveBinding(props?.text, 'Кнопка');
-        const textValue = formatForDisplay(rawText);
+        const label = resolveProp(props, 'label', null);
+        const textValue = formatForDisplay(label || rawText);
         const variant = resolveProp(props, 'variant', 'primary');
         const size = resolveProp(props, 'size', 'medium');
         const widgetStyle = resolveWidgetStyles('button', { variant, size });
         const style = mergeStyles(widgetStyle?.style ?? {}, component.style);
-        const rawEventName = resolveProp(props, 'event', component?.event ?? null);
+        
+        // Support multiple event formats:
+        // 1. props.event (legacy)
+        // 2. component.event (legacy)
+        // 3. component.events.onClick (new avitoDemo format)
+        const rawEventName = resolveProp(props, 'event', 
+          component?.event ?? 
+          component?.events?.onClick ?? 
+          null
+        );
         const eventName = typeof rawEventName === 'string' ? rawEventName.trim() : '';
+        
+        // Support eventParams for passing additional data (e.g., itemId)
+        const eventParamsRaw = props?.eventParams || component?.eventParams || {};
+        const eventParams = {};
+        Object.entries(eventParamsRaw).forEach(([key, value]) => {
+          // Resolve bindings in eventParams (e.g., ${cartItem.id})
+          eventParams[key] = resolveBindingValue(value, context, iterationStack);
+        });
+        
         const disabledProp = Boolean(resolveProp(props, 'disabled', false));
         const isDisabled = disabledProp || (isEventPending && eventName);
         const handleClick = () => {
@@ -355,7 +374,8 @@ const SandboxScreenRenderer = ({
           if (!eventName || typeof onEvent !== 'function') {
             return;
           }
-          onEvent(eventName);
+          // Pass eventParams as second argument
+          onEvent(eventName, eventParams);
         };
 
         return (
@@ -369,6 +389,45 @@ const SandboxScreenRenderer = ({
           >
             {textValue}
           </button>
+        );
+      }
+
+      case 'checkbox': {
+        const label = resolveProp(props, 'label', '');
+        const checked = Boolean(resolveProp(props, 'checked', false));
+        const rawEventName = resolveProp(props, 'event', component?.event ?? null);
+        const eventName = typeof rawEventName === 'string' ? rawEventName.trim() : '';
+        const disabledProp = Boolean(resolveProp(props, 'disabled', false));
+        const isDisabled = disabledProp || (isEventPending && eventName);
+        
+        const handleChange = () => {
+          trackClick({
+            componentId: component.id ?? null,
+            componentType: component.type,
+            screenId: activeScreenId,
+            screenName: activeScreenName,
+            label: label || component.id || 'checkbox',
+            eventName: eventName || null
+          });
+          if (!eventName || typeof onEvent !== 'function') {
+            return;
+          }
+          onEvent(eventName);
+        };
+
+        const style = mergeStyles({}, component.style);
+
+        return (
+          <label className="canvas-checkbox" style={style}>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={handleChange}
+              disabled={isDisabled}
+              data-event={eventName || undefined}
+            />
+            {label && <span className="canvas-checkbox-label">{label}</span>}
+          </label>
         );
       }
 

@@ -62,6 +62,17 @@ const ProductList = () => {
         createdBy: 'aleksandrzvezdakov',
         screens: 6,
         actions: 12
+      },
+      {
+        id: 'avito-cart-demo',
+        name: 'Авито — Корзина',
+        description: 'Демонстрационный сценарий корзины Avito: добавление товаров, изменение количества, upsell-блоки и переход к оформлению',
+        status: 'active',
+        version: '1.0.0',
+        lastModified: '2024-01-01T12:00:00Z',
+        createdBy: 'aleksandrzvezdakov',
+        screens: 11,
+        actions: 25
       }
     ];
     

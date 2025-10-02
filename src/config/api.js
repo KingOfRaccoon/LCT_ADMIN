@@ -16,8 +16,8 @@
  * - Localhost: 'http://127.0.0.1:8080'
  * - Custom: 'https://your-server.com'
  */
-export const BASE_URL = 'https://sandkittens.me';
-// export const BASE_URL = 'http://127.0.0.1:8080';
+// export const BASE_URL = 'https://sandkittens.me';
+export const BASE_URL = 'http://127.0.0.1:8080';
 
 // ====================================
 // Дополнительные настройки (опционально)

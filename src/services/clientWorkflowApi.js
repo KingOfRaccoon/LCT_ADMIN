@@ -9,7 +9,7 @@ import { getClientSessionId, touchClientSession } from '../utils/clientSession.j
 import { getApiUrl, API_ENDPOINTS, logApiRequest, logApiResponse, logApiError } from '../config/api.js';
 
 /**
- * Нормализует контекст от API: преобразует строковые "None", "null", "undefined" в null
+ * Нормализует контекст от API: преобразует строковые "None", "null", "undefined", "False", "True" в null/boolean
  * и пытается распарсить JSON-строки в объекты/массивы
  * @param {Object} context - Контекст от API
  * @returns {Object} - Нормализованный контекст
@@ -25,6 +25,16 @@ function normalizeContext(context) {
     // Преобразуем строковые пустышки в null
     if (value === 'None' || value === 'null' || value === 'undefined') {
       normalized[key] = null;
+      continue;
+    }
+
+    // Преобразуем строковые булевы значения (Python возвращает "True"/"False")
+    if (value === 'False' || value === 'false') {
+      normalized[key] = false;
+      continue;
+    }
+    if (value === 'True' || value === 'true') {
+      normalized[key] = true;
       continue;
     }
 

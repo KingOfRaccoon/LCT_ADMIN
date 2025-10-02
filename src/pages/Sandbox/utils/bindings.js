@@ -1,4 +1,5 @@
 import logger from '../../../utils/logger.js';
+import { transpilePythonToJs, safeEvalExpression } from './pythonToJs.js';
 
 const cloneDeep = (value) => {
   if (typeof structuredClone === 'function') {
@@ -68,8 +69,18 @@ export const getContextValue = (context, path) => {
   for (let i = 0; i < segments.length; i += 1) {
     const segment = segments[i];
 
-    // Защита от null, undefined и строковых заглушек типа "None"
-    if (acc === undefined || acc === null || acc === 'None' || acc === 'null' || acc === 'undefined') {
+    // Защита от null, undefined, строковых заглушек типа "None", "False", "True"
+    if (
+      acc === undefined || 
+      acc === null || 
+      acc === 'None' || 
+      acc === 'null' || 
+      acc === 'undefined' ||
+      acc === 'False' ||
+      acc === 'false' ||
+      acc === 'True' ||
+      acc === 'true'
+    ) {
       if (isSandboxDev) {
         // lightweight dev trace
         logger.debug('[sandbox] getContextValue stop', { path, segment, index: i, accumulator: acc });
@@ -212,6 +223,43 @@ export const resolveBindingValue = (value, context, fallback, options = {}) => {
       return iterationLookup.value;
     }
   } else if (normalized) {
+    // Проверяем, содержит ли биндинг Python-синтаксис (str(), in, if/else)
+    const hasPythonSyntax = /\b(str|len)\(|if\s+.+\s+else\s+|\s+in\s+/.test(normalized);
+    
+    if (hasPythonSyntax) {
+      // Транспилируем Python → JS и вычисляем
+      try {
+        const jsExpression = transpilePythonToJs(normalized);
+        
+        // Создаем расширенный контекст с итерациями
+        const extendedContext = { ...context };
+        iterationStack.forEach((frame) => {
+          const alias = frame.alias || 'item';
+          extendedContext[alias] = frame.item;
+          extendedContext[`${alias}Index`] = frame.index;
+          extendedContext[`${alias}Total`] = frame.total;
+        });
+        
+        const resolved = safeEvalExpression(jsExpression, extendedContext);
+        
+        if (isSandboxDev) {
+          logger.debug('[sandbox] resolveBindingValue python', {
+            reference: value.reference,
+            normalized,
+            jsExpression,
+            resolved
+          });
+        }
+        
+        if (resolved !== undefined) {
+          return resolved;
+        }
+      } catch (error) {
+        console.warn('[sandbox] Failed to transpile Python expression:', normalized, error);
+      }
+    }
+    
+    // Стандартная логика для простых путей
     const resolved = getContextValue(context, normalized);
     if (isSandboxDev) {
       logger.debug('[sandbox] resolveBindingValue', { reference: value.reference, normalized, resolved });

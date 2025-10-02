@@ -45,6 +45,16 @@ function normalizeContext(context) {
       continue;
     }
 
+    // Преобразуем строковые булевы значения (Python → "True"/"False")
+    if (value === 'False' || value === 'false') {
+      normalized[key] = false;
+      continue;
+    }
+    if (value === 'True' || value === 'true') {
+      normalized[key] = true;
+      continue;
+    }
+
     // Парсим JSON-строки (Python использует одинарные кавычки)
     if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
       try {
@@ -74,7 +84,8 @@ function normalizeContext(context) {
 ### До исправления:
 ```json
 {
-  "cart_snapshot": "None",
+  "cart_snapshot": "None",  // или "False"
+  "init_done": "True",
   "stores_catalog": "[{'id': 201, 'name': 'Pear Store'}]"
 }
 ```
@@ -83,8 +94,9 @@ function normalizeContext(context) {
 ### После исправления:
 ```json
 {
-  "cart_snapshot": null,
-  "stores_catalog": [{"id": 201, "name": "Pear Store"}]
+  "cart_snapshot": null,  // "None" → null
+  "init_done": true,      // "True" → true
+  "stores_catalog": [{"id": 201, "name": "Pear Store"}]  // JSON распарсен
 }
 ```
 → Биндинг использует fallback-значение → корректное отображение
@@ -99,7 +111,9 @@ node test-context-normalization.js
 
 **Результат:**
 ```
-✅ cart_snapshot: null
+✅ cart_snapshot: false (булев)
+✅ cart_snapshot_error_flag: false
+✅ init_done: true
 ✅ recommended_products: array
 ✅ stores_catalog: array
 ✅ selected_items: array (не изменено)

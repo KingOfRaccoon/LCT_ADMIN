@@ -2,7 +2,8 @@
  * Утилита для работы с Workflow API
  */
 
-const API_BASE = 'http://127.0.0.1:8000';
+import { getBaseUrl, getApiUrl, API_ENDPOINTS, logApiRequest, logApiResponse, logApiError } from '../config/api';
+import { getClientSessionId } from './clientSession.js';
 
 /**
  * Получить workflow по client_session_id и client_workflow_id
@@ -16,30 +17,47 @@ const API_BASE = 'http://127.0.0.1:8000';
  * console.log(workflow.nodes, workflow.edges, workflow.initialContext);
  */
 export async function fetchWorkflowById(clientSessionId, clientWorkflowId) {
+  console.log('[fetchWorkflowById] Called with:', { clientSessionId, clientWorkflowId });
+  
   if (!clientSessionId || !clientWorkflowId) {
     throw new Error('clientSessionId и clientWorkflowId обязательны');
   }
 
-  const url = `${API_BASE}/client/workflow`;
+  const url = getApiUrl(API_ENDPOINTS.WORKFLOW);
+  const startTime = Date.now();
+  
+  const requestBody = {
+    client_session_id: clientSessionId,
+    client_workflow_id: clientWorkflowId,
+  };
+  
+  console.log('[fetchWorkflowById] Request body:', requestBody);
+  
+  logApiRequest('POST', url, requestBody);
   
   try {
+    const bodyString = JSON.stringify(requestBody);
+    console.log('[fetchWorkflowById] Sending body (stringified):', bodyString);
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        client_session_id: clientSessionId,
-        client_workflow_id: clientWorkflowId,
-      }),
+      body: bodyString,
     });
+
+    const duration = Date.now() - startTime;
 
     if (!response.ok) {
       const errorText = await response.text();
+      logApiError('POST', url, new Error(`Status ${response.status}`), duration);
       throw new Error(`API ответил статусом ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
+    
+    logApiResponse('POST', url, response, duration);
     
     // Валидация структуры ответа
     if (!data || typeof data !== 'object') {
@@ -48,9 +66,18 @@ export async function fetchWorkflowById(clientSessionId, clientWorkflowId) {
 
     return data;
   } catch (error) {
+    const duration = Date.now() - startTime;
+    
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error(`Не удалось подключиться к API: ${url}. Проверьте, что сервер запущен.`);
+      const networkError = new Error(`Не удалось подключиться к API: ${url}. Проверьте, что сервер запущен.`);
+      logApiError('POST', url, networkError, duration);
+      throw networkError;
     }
+    
+    if (!error.message.includes('[API]')) {
+      logApiError('POST', url, error, duration);
+    }
+    
     throw error;
   }
 }
@@ -131,9 +158,22 @@ export function parseWorkflowUrlParams(searchParams) {
   const params = typeof searchParams === 'string' 
     ? new URLSearchParams(searchParams) 
     : searchParams;
+  
+  const sessionId = params.get('session_id');
+  const workflowId = params.get('workflow_id');
+  
+  console.log('[parseWorkflowUrlParams] Raw params:', {
+    sessionId,
+    workflowId,
+    allParams: Array.from(params.entries())
+  });
     
-  return {
-    clientSessionId: params.get('session_id') || "1234567890",
-    clientWorkflowId: params.get('workflow_id') || "68dc809b2d27ca7ee267be51",
+  const result = {
+    clientSessionId: sessionId || getClientSessionId(), // ✅ FIX: используем getClientSessionId() вместо generateSessionId()
+    clientWorkflowId: workflowId || "68dd68fe8341ae5cb6c60024",
   };
+  
+  console.log('[parseWorkflowUrlParams] Result:', result);
+  
+  return result;
 }

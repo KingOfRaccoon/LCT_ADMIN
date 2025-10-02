@@ -6,6 +6,7 @@
  */
 
 import '../types/workflowContract.js';
+import { getBaseUrl } from '../config/api';
 
 /**
  * Workflow API Client Class
@@ -14,7 +15,7 @@ export class WorkflowAPI {
   /**
    * @param {string} baseUrl - Базовый URL сервера
    */
-  constructor(baseUrl = 'http://127.0.0.1:8000') {
+  constructor(baseUrl = getBaseUrl()) {
     this.baseUrl = baseUrl;
   }
 
@@ -50,6 +51,15 @@ export class WorkflowAPI {
       url: `${this.baseUrl}/workflow/save`,
       statesCount: normalizedStates.length,
       requestBody
+    });
+
+    // Детальное логирование screen полей
+    console.log('🔍 Screen fields in states:');
+    normalizedStates.forEach((state, index) => {
+      const hasScreen = state.screen && Object.keys(state.screen).length > 0;
+      console.log(`  [${index}] ${state.name} (${state.state_type}): screen=${hasScreen ? 'YES' : 'NO'}`, 
+        hasScreen ? `(${Object.keys(state.screen).join(', ')})` : ''
+      );
     });
 
     try {
@@ -192,6 +202,7 @@ export class WorkflowAPI {
     const normalized = {
       state_type: state.state_type || 'screen',
       name: state.name || state.state_name || '',
+      screen: state.screen || {},                   // ✅ Добавлено поле screen
       initial_state: Boolean(state.initial_state),  // Принудительно boolean
       final_state: Boolean(state.final_state),      // Принудительно boolean
       expressions: state.expressions || [],         // Дефолт пустой массив

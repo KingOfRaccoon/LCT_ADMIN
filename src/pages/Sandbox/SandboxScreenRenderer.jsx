@@ -321,7 +321,9 @@ const SandboxScreenRenderer = ({
           flexDirection: 'row',
           gap: spacingToCss(props?.spacing ?? 16),
           padding: paddingValue,
-          width: '100%'
+          width: '100%',
+          alignItems: props?.alignItems,
+          justifyContent: props?.justifyContent
         };
         const style = mergeStyles(baseStyle, component.style);
 

@@ -15,7 +15,12 @@
     "sandbox:test": "node --test",
     "test": "npm run sandbox:test",
     "playground": "ladle serve",
-    "playground:build": "ladle build"
+    "playground:build": "ladle build",
+    "improve:avito": "node scripts/improveAvitoUI.js"
+  },
+  "_comments": {
+    "dev:full": "Для работы Preview откройте 2 терминала: 'npm run sandbox:server' + 'npm run dev'. См. docs/SANDBOX_SERVER_SETUP.md",
+    "improve:avito": "Улучшает UI avitoDemo до стандартов реального Avito (цвета, шрифты, отступы, радиусы)"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

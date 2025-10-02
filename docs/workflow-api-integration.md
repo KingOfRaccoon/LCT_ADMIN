@@ -10,7 +10,7 @@
 
 Получить workflow по client_session_id и client_workflow_id.
 
-**URL:** `http://localhost:8000/client/workflow` (или `VITE_WORKFLOW_API_BASE` из .env)
+**URL:** `https://sandkittens.me/client/workflow` (или `VITE_WORKFLOW_API_BASE` из .env)
 
 **Method:** `POST`
 
@@ -125,14 +125,14 @@ console.log(rawData);
 
 ```bash
 # API endpoint для загрузки workflow
-VITE_WORKFLOW_API_BASE=http://localhost:8000
+VITE_WORKFLOW_API_BASE=https://sandkittens.me
 
 # API endpoint для sandbox (legacy)
 VITE_SANDBOX_API_BASE=http://localhost:5050
 ```
 
 **По умолчанию:**
-- `VITE_WORKFLOW_API_BASE` = `http://localhost:8000`
+- `VITE_WORKFLOW_API_BASE` = `https://sandkittens.me`
 - `VITE_SANDBOX_API_BASE` = пусто (не используется)
 
 ## 🔄 Приоритеты загрузки
@@ -434,7 +434,7 @@ try {
 ### Проблема: "Не удалось подключиться к API"
 
 **Решение:**
-1. Проверьте, что backend запущен на `http://localhost:8000`
+1. Проверьте, что backend доступен по `https://sandkittens.me`
 2. Проверьте `VITE_WORKFLOW_API_BASE` в `.env`
 3. Проверьте CORS настройки на backend
 

@@ -146,6 +146,25 @@ src/
 - **Node.js** ≥ 20.19.0
 - **npm** ≥ 10.9.0
 
+### Деплой на поддомен 🌐
+
+Проект настроен для деплоя на `https://sandkittens.me/admin/panel`:
+
+```bash
+# Production build (с базовым путем /admin/panel)
+npm run build
+
+# Preview локально
+npm run preview
+# Открыть: http://localhost:4173/admin/panel
+```
+
+**Конфигурация:**
+- `.env.development` — для локальной разработки (base: `/`)
+- `.env.production` — для продакшена (base: `/admin/panel`)
+
+Подробнее: [docs/DEPLOY_SUBDOMAIN.md](./docs/DEPLOY_SUBDOMAIN.md)
+
 ### Установка
 
 ```bash
@@ -155,28 +174,45 @@ cd TeST
 
 # Установить зависимости
 npm install
+```
 
+### Вариант 1: Только Frontend (без Sandbox API)
+
+```bash
 # Запустить dev-сервер
 npm run dev
 # → http://localhost:5173
 
-# Production build
-npm run build
-
-# Превью production сборки
-npm run preview
+# Sandbox и Preview будут работать с статичными JSON файлами
+# из src/pages/Sandbox/data/
 ```
 
-### Запуск Sandbox API (опционально)
+### Вариант 2: Frontend + Sandbox API ✅ Рекомендуется для Preview
 
-**JavaScript backend:**
+**Для полноценной работы Preview страницы** нужны **два сервера**:
+
+**Терминал 1 - Sandbox JS Server:**
 ```bash
 npm run sandbox:server
 # → http://localhost:5050
 # Переменная окружения: SANDBOX_PRESET=avitoDemo (default) или ecommerceDashboard
 ```
 
-**Python backend (FastAPI):**
+**Терминал 2 - Vite Dev Server:**
+```bash
+npm run dev
+# → http://localhost:5173
+# Автоматически проксирует /api/start и /api/action на localhost:5050
+```
+
+**Проверка работы:**
+- http://localhost:5173/preview - ✅ Работает с локальным JS сервером
+- http://localhost:5173/sandbox - ✅ Работает с офлайн данными или API
+
+> 📖 **Подробная документация:** [docs/SANDBOX_SERVER_SETUP.md](./docs/SANDBOX_SERVER_SETUP.md)
+
+### Вариант 3: Python Backend (FastAPI)
+
 ```bash
 cd server
 pip install -r requirements.txt
@@ -184,6 +220,14 @@ pip install -r requirements.txt
 # Запуск Sandbox API (порт 8000)
 uvicorn main:app --reload
 # → http://localhost:8000
+```
+
+### Production Build
+
+```bash
+npm run build
+npm run preview
+# → http://localhost:4173
 ```
 
 > **⚠️ Важно про Workflow Export:**  

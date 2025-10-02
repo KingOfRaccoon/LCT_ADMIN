@@ -333,6 +333,127 @@ interface Node {
 }
 ```
 
+### State (Workflow Contract)
+
+```typescript
+interface StateModel {
+  state_type: 'screen' | 'technical' | 'integration' | 'service';
+  name: string;
+  screen: Screen | {};  // Полный объект Screen для state_type='screen', пустой для остальных
+  initial_state: boolean;
+  final_state: boolean;
+  expressions: (EventExpression | TechnicalExpression | IntegrationExpression)[];
+  transitions: Transition[];
+}
+
+interface EventExpression {
+  event_name: string;  // Имя события (для screen states)
+}
+
+interface TechnicalExpression {
+  variable: string;
+  dependent_variables: string[];
+  expression: string;  // Вычисляемое выражение
+}
+
+interface IntegrationExpression {
+  variable: string;
+  url: string;
+  params: Record<string, any>;
+  method: 'get' | 'post' | 'put' | 'delete';
+}
+
+interface Transition {
+  state_id: string;    // Имя целевого состояния
+  case?: string | null;  // Условие перехода (для technical/integration) или null
+  variable?: string;   // Переменная для проверки условия
+}
+```
+
+**Пример контракта для отправки на `/workflow/save`:**
+
+```json
+{
+  "states": {
+    "states": [
+      {
+        "state_type": "screen",
+        "name": "Загрузка корзины",
+        "screen": {
+          "id": "screen-loading",
+          "type": "Screen",
+          "name": "Загрузка",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "minHeight": "720px",
+            "backgroundColor": "#ffffff"
+          },
+          "sections": {
+            "body": {
+              "id": "section-loading-body",
+              "type": "Section",
+              "properties": {
+                "slot": "body",
+                "padding": 48
+              },
+              "children": [
+                {
+                  "id": "text-loading",
+                  "type": "text",
+                  "properties": {
+                    "content": "Загружаем вашу корзину…"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "initial_state": true,
+        "final_state": false,
+        "expressions": [
+          {
+            "event_name": "loadComplete"
+          }
+        ],
+        "transitions": [
+          {
+            "state_id": "Корзина (основной экран)",
+            "case": null
+          }
+        ]
+      },
+      {
+        "state_type": "technical",
+        "name": "Увеличение количества",
+        "screen": {},
+        "initial_state": false,
+        "final_state": false,
+        "expressions": [
+          {
+            "variable": "cart.items",
+            "dependent_variables": ["cart.items", "inputs.itemId"],
+            "expression": "modifyCartItem(cart.items, inputs.itemId, 1)"
+          }
+        ],
+        "transitions": [
+          {
+            "state_id": "Корзина (основной экран)",
+            "case": null
+          }
+        ]
+      }
+    ]
+  },
+  "predefined_context": {
+    "cart": {
+      "items": [],
+      "totalPrice": 0
+    }
+  }
+}
+```
+
 ### Edge
 
 ```typescript
@@ -715,12 +836,155 @@ const componentTree = screenConfig.sections
 - ✅ Support для sections и legacy components format
 - ✅ avitoDemo.json и ecommerceDashboard.json presets
 
-### Future (v1.1.0)
+### v1.1.0 (2025-10-01)
+- ✅ POST /workflow/save — экспорт workflow с полными screen данными
+- ✅ StateModel контракт с поддержкой screen objects
+- ✅ Автоматическая конвертация graphData в StateModel[]
+
+### Future (v1.2.0)
 - ⏳ GET /api/products — список доступных продуктов
 - ⏳ GET /api/products/:id — метаданные продукта
 - ⏳ POST /api/reset — сброс сеанса
 - ⏳ WebSocket support для real-time updates
 - ⏳ Authentication (JWT tokens)
+
+---
+
+## Workflow Export API
+
+### `POST /workflow/save`
+
+Сохраняет workflow на сервере в формате StateModel. Каждое состояние может содержать полный объект экрана.
+
+#### Request
+
+```http
+POST /workflow/save
+Content-Type: application/json
+
+{
+  "states": {
+    "states": [
+      {
+        "state_type": "screen",
+        "name": "Login Screen",
+        "screen": {
+          "id": "screen-login",
+          "type": "Screen",
+          "sections": {
+            "body": {
+              "children": [
+                {
+                  "id": "input-username",
+                  "type": "input",
+                  "properties": {
+                    "label": "Username"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "initial_state": true,
+        "final_state": false,
+        "expressions": [{"event_name": "login"}],
+        "transitions": [{"state_id": "Validate", "case": null}]
+      },
+      {
+        "state_type": "technical",
+        "name": "Validate",
+        "screen": {},
+        "initial_state": false,
+        "final_state": false,
+        "expressions": [
+          {
+            "variable": "is_valid",
+            "dependent_variables": ["username", "password"],
+            "expression": "username != '' and password != ''"
+          }
+        ],
+        "transitions": [
+          {"state_id": "Success", "case": "is_valid == true", "variable": "is_valid"},
+          {"state_id": "Error", "case": "is_valid == false", "variable": "is_valid"}
+        ]
+      }
+    ]
+  },
+  "predefined_context": {
+    "username": "",
+    "password": ""
+  }
+}
+```
+
+#### Response
+
+**Success (200 OK):**
+```json
+{
+  "wf_description_id": "wf_abc123def456",
+  "message": "Workflow saved successfully",
+  "states_count": 5,
+  "timestamp": "2025-10-01T12:34:56.789Z"
+}
+```
+
+**Error (400 Bad Request):**
+```json
+{
+  "detail": "Expected exactly 1 initial state, got 0"
+}
+```
+
+#### Validation Rules
+
+1. **Ровно 1 initial_state** — должен быть ровно один узел с `initial_state: true`
+2. **Минимум 1 final_state** — должен быть хотя бы один узел с `final_state: true`
+3. **Уникальные имена** — все `name` должны быть уникальными
+4. **Существование целей** — все `transitions[].state_id` должны существовать
+5. **Integration правила** — Integration states должны иметь ровно 1 transition с `case: null`
+
+#### Client-side Usage
+
+**JavaScript:**
+```javascript
+import { mapGraphDataToWorkflow } from './utils/workflowMapper';
+import { WorkflowAPI } from './services/workflowApi';
+
+const graphData = {
+  nodes: [...],
+  edges: [...],
+  screens: {
+    'screen-id': {
+      id: 'screen-id',
+      sections: {...}
+    }
+  }
+};
+
+const workflow = mapGraphDataToWorkflow(graphData, initialContext);
+const api = new WorkflowAPI('https://api.backend.com');
+const response = await api.saveWorkflow(workflow.states, workflow.predefined_context);
+
+console.log('Workflow ID:', response.wf_description_id);
+```
+
+**React Component:**
+```jsx
+import { WorkflowExportButton } from './components/WorkflowExportButton';
+
+<WorkflowExportButton
+  graphData={{
+    nodes: product.nodes,
+    edges: product.edges,
+    screens: product.screens  // Включите screens!
+  }}
+  initialContext={product.initialContext}
+  productId={product.id}
+/>
+```
+
+См. также: [`docs/WORKFLOW_SCREEN_INTEGRATION.md`](./WORKFLOW_SCREEN_INTEGRATION.md) для деталей.
 
 ---
 

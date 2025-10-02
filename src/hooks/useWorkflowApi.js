@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { WorkflowAPI } from '../services/workflowApi';
 import { mapGraphDataToWorkflow } from '../utils/workflowMapper';
+import { getBaseUrl } from '../config/api';
 
 // Ключи для localStorage
 const STORAGE_KEYS = {
@@ -18,7 +19,11 @@ const STORAGE_KEYS = {
 };
 
 // Дефолтный URL сервера
-const DEFAULT_SERVER_URL = 'http://127.0.0.1:8000';
+const DEFAULT_SERVER_URL = getBaseUrl();
+
+/**
+ * Хук для работы с Workflow API
+ */
 
 /**
  * Хук для работы с Workflow API

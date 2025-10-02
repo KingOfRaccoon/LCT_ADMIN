@@ -6,6 +6,8 @@
   background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
   min-height: 100vh;
   box-sizing: border-box;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .sandbox-sidebar {
@@ -26,6 +28,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .sandbox-card-header {
@@ -198,6 +203,8 @@
 .sandbox-history-patch-key {
   font-family: 'JetBrains Mono', monospace;
   color: #1d4ed8;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .sandbox-history-patch-value {
@@ -291,18 +298,27 @@
 .sandbox-context-key {
   font-family: 'JetBrains Mono', monospace;
   color: #475569;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .sandbox-context-value {
   font-family: 'JetBrains Mono', monospace;
   color: #0f172a;
   text-align: right;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .sandbox-main {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .sandbox-header {
@@ -314,6 +330,8 @@
   padding: 24px 28px;
   box-shadow: 0 32px 60px -24px rgba(15, 23, 42, 0.45);
   border: 1px solid rgba(148, 163, 184, 0.28);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sandbox-header-actions {
@@ -364,6 +382,8 @@
   padding: 20px 24px;
   box-shadow: 0 18px 48px -24px rgba(15, 23, 42, 0.4);
   border: 1px solid rgba(203, 213, 225, 0.6);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sandbox-status-label {
@@ -389,6 +409,8 @@
   box-shadow: inset 0 12px 32px rgba(148, 163, 184, 0.12);
   border: 1px solid rgba(148, 163, 184, 0.35);
   overflow: auto;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sandbox-api-result {
@@ -407,6 +429,8 @@
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .sandbox-renderer {
@@ -445,6 +469,8 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sandbox-transitions header h2 {
@@ -474,6 +500,15 @@
   border-radius: 22px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sandbox-transition-body {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .sandbox-transition-body h3 {
@@ -481,12 +516,16 @@
   font-size: 16px;
   font-weight: 600;
   color: #0f172a;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .sandbox-transition-body p {
   margin: 6px 0 0;
   font-size: 13px;
   color: #475569;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .sandbox-transition-patch {
@@ -509,11 +548,15 @@
 .sandbox-transition-key {
   font-family: 'JetBrains Mono', monospace;
   color: #1d4ed8;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .sandbox-transition-value {
   font-family: 'JetBrains Mono', monospace;
   color: #0f172a;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .sandbox-transition-action {

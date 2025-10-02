@@ -87,7 +87,7 @@ const ProductOverview = () => {
       setIsLoadingData(true);
       loadAvitoDemoAsGraphData()
         .then((data) => {
-          setGraphData({ nodes: data.nodes, edges: data.edges });
+          setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
           setVariableSchemas(data.variableSchemas);
           
           // Преобразуем screens в массив для ProductOverview

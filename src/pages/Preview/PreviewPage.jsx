@@ -3,17 +3,31 @@ import { useSearchParams } from 'react-router-dom';
 import SandboxScreenRenderer from '../Sandbox/SandboxScreenRenderer';
 import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
 import { loadWorkflow, parseWorkflowUrlParams } from '../../utils/workflowApi';
+import { useClientWorkflow } from '../../hooks/useClientWorkflow';
+import { Activity, RotateCcw, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import './PreviewPage.css';
 
-const API_BASE = (import.meta.env.VITE_SANDBOX_API_BASE ?? '').replace(/\/$/, '');
-
+/**
+ * buildApiUrl строит URL для Sandbox API endpoints (/api/start, /api/action)
+ * 
+ * По умолчанию использует относительные пути, которые проксируются через Vite
+ * на локальный JS сервер (http://localhost:5050).
+ * 
+ * Можно переопределить через VITE_SANDBOX_API_BASE для прямых запросов к серверу.
+ */
 const buildApiUrl = (path) => {
-  if (!path) {
-    return API_BASE || '';
+  const apiBase = import.meta.env.VITE_SANDBOX_API_BASE;
+  
+  // Если базовый URL не задан, используем относительные пути (они проксируются Vite)
+  if (!apiBase || apiBase.trim() === '') {
+    return path;
   }
+  
+  // Если задан, строим полный URL
+  const base = apiBase.replace(/\/$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${API_BASE}${normalizedPath}`;
+  return `${base}${normalizedPath}`;
 };
 
 const PreviewPage = () => {

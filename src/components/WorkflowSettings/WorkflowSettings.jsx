@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useWorkflowApi } from '../../hooks/useWorkflowApi';
 import { CheckCircle, XCircle, Settings, Server, Save, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getBaseUrl } from '../../config/api';
 import './WorkflowSettings.css';
 
 export function WorkflowSettings({ productId, onClose }) {
@@ -51,19 +52,31 @@ export function WorkflowSettings({ productId, onClose }) {
   };
 
   // Сохранение настроек
-  const handleSave = () => {
-    workflow.setServerUrl(serverUrl);
-    workflow.setAutoSave(autoSave);
+  const handleOpenSettings = useCallback(() => {
+    setShowSettings(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false);
+  }, []);
+
+  const handleSaveSettings = useCallback((settings) => {
+    const defaultUrl = getBaseUrl(); // Используем глобальную конфигурацию
+    const effectiveUrl = settings.serverUrl?.trim() || defaultUrl;
+
+    setServerUrl(effectiveUrl);
+    setAutoSave(settings.autoSave ?? false);
+
+    workflow.setServerUrl(effectiveUrl);
+    workflow.setAutoSave(settings.autoSave ?? false);
+
+    setShowSettings(false);
     toast.success('Настройки сохранены');
-    
-    if (onClose) {
-      onClose();
-    }
-  };
+  }, [workflow]);
 
   // Сброс настроек
   const handleReset = () => {
-    const defaultUrl = 'http://127.0.0.1:8000';
+    const defaultUrl = getBaseUrl(); // Используем глобальную конфигурацию
     setServerUrl(defaultUrl);
     setAutoSave(false);
     workflow.setServerUrl(defaultUrl);
@@ -109,7 +122,7 @@ export function WorkflowSettings({ productId, onClose }) {
               type="text"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="http://127.0.0.1:8000"
+              placeholder={getBaseUrl()}
             />
             <button
               className="btn btn-secondary btn-sm"

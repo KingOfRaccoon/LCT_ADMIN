@@ -57,7 +57,7 @@ export async function testSimpleFlow() {
     const workflow = mapGraphDataToWorkflow(graphData, initialContext);
     console.log('✅ Workflow converted:', workflow);
 
-    const api = new WorkflowAPI('http://127.0.0.1:8000');
+    const api = new WorkflowAPI('https://sandkittens.me');
     const response = await api.saveWorkflow(workflow.states, workflow.predefined_context);
     
     console.log('✅ Server response:', response);
@@ -129,7 +129,7 @@ export async function testApiCallFlow() {
     const workflow = mapGraphDataToWorkflow(graphData, initialContext);
     console.log('✅ Workflow converted:', workflow);
 
-    const api = new WorkflowAPI('http://127.0.0.1:8000');
+    const api = new WorkflowAPI('https://sandkittens.me');
     const response = await api.saveWorkflow(workflow.states, workflow.predefined_context);
     
     console.log('✅ Server response:', response);
@@ -207,7 +207,7 @@ export async function testTechnicalFlow() {
     const workflow = mapGraphDataToWorkflow(graphData, initialContext);
     console.log('✅ Workflow converted:', workflow);
 
-    const api = new WorkflowAPI('http://127.0.0.1:8000');
+    const api = new WorkflowAPI('https://sandkittens.me');
     const response = await api.saveWorkflow(workflow.states, workflow.predefined_context);
     
     console.log('✅ Server response:', response);
@@ -295,7 +295,7 @@ export async function testConditionFlow() {
     const workflow = mapGraphDataToWorkflow(graphData, initialContext);
     console.log('✅ Workflow converted:', workflow);
 
-    const api = new WorkflowAPI('http://127.0.0.1:8000');
+    const api = new WorkflowAPI('https://sandkittens.me');
     const response = await api.saveWorkflow(workflow.states, workflow.predefined_context);
     
     console.log('✅ Server response:', response);

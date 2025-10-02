@@ -16,12 +16,28 @@ function detectStateType(node) {
   const nodeType = node.type?.toLowerCase();
   const nodeData = node.data || {};
 
-  // Action узлы с API вызовами
+  // Если есть actionType в data - это action узел
+  if (nodeData.actionType) {
+    // API вызовы
+    if (nodeData.actionType === 'api-call') {
+      return 'integration';
+    }
+    // Условия, вычисления, модификация корзины
+    if (nodeData.actionType === 'condition' || 
+        nodeData.actionType === 'modify-cart-item' ||
+        nodeData.actionType === 'calculation') {
+      return 'technical';
+    }
+    // Другие действия (context-update и т.д.) - тоже technical
+    return 'technical';
+  }
+
+  // Action узлы с API вызовами (по типу узла)
   if (nodeType === 'action' && nodeData.actionType === 'api-call') {
     return 'integration';
   }
 
-  // Action узлы с вычислениями/условиями
+  // Action узлы с вычислениями/условиями (по типу узла)
   if (nodeType === 'action' && 
       (nodeData.actionType === 'condition' || 
        nodeData.actionType === 'modify-cart-item' ||
@@ -29,8 +45,8 @@ function detectStateType(node) {
     return 'technical';
   }
 
-  // Screen узлы
-  if (nodeType === 'screen') {
+  // Screen узлы (явно указан тип или есть screenId)
+  if (nodeType === 'screen' || nodeData.screenId) {
     return 'screen';
   }
 
@@ -100,9 +116,12 @@ function createIntegrationExpressions(nodeData) {
   const expressions = [];
   const config = nodeData.config || {};
 
+  // Определяем имя переменной для результата API
+  const resultVariable = config.resultVariable || config.variable || 'api_result';
+
   if (config.url) {
     expressions.push({
-      variable: config.resultVariable || 'apiResult',
+      variable: resultVariable,
       url: config.url,
       params: config.params || {},
       method: config.method?.toLowerCase() || 'get'
@@ -161,44 +180,77 @@ function extractDependencies(value) {
  * @param {Array} outgoingEdges - Исходящие рёбра
  * @param {StateType} stateType - Тип состояния
  * @param {Map} nodeIdToName - Карта nodeId -> state_name
+ * @param {Object} nodeData - Данные узла (для извлечения variable из config)
  * @returns {Transition[]}
  */
-function createTransitions(outgoingEdges, stateType, nodeIdToName) {
+function createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData = {}) {
   const transitions = [];
 
   if (stateType === 'integration') {
-    // Integration state должен иметь ровно 1 transition с case=null
+    // Integration state должен иметь ровно 1 transition с case=null и variable
     if (outgoingEdges.length > 0) {
       const firstEdge = outgoingEdges[0];
       const targetStateName = nodeIdToName.get(firstEdge.target) || firstEdge.target;
+      
+      // Извлекаем variable из config или edge
+      const variable = nodeData.config?.resultVariable || 
+                      nodeData.config?.variable || 
+                      firstEdge.data?.variable ||
+                      'api_result';
+      
       transitions.push({
-        state_id: targetStateName,
-        case: null
+        variable: variable,
+        case: null, // Integration всегда имеет case=null
+        state_id: targetStateName
       });
     }
-  } else {
-    // Для остальных типов - все transitions
+  } else if (stateType === 'screen') {
+    // Screen state: case = event_name из ребра
     outgoingEdges.forEach(edge => {
       const targetStateName = nodeIdToName.get(edge.target) || edge.target;
+      const eventName = edge.data?.event || edge.label || null;
+      
+      const transition = {
+        case: eventName, // event_name для screen состояний
+        state_id: targetStateName
+      };
+
+      transitions.push(transition);
+    });
+  } else {
+    // Technical и service states: variable + case (condition)
+    outgoingEdges.forEach(edge => {
+      const targetStateName = nodeIdToName.get(edge.target) || edge.target;
+      
+      // Для technical state порядок: variable, case, state_id
+      const variable = edge.data?.variable || 
+                      nodeData.config?.resultVariable ||
+                      nodeData.config?.variable ||
+                      null;
+      
+      const condition = edge.data?.case || edge.data?.condition;
+      
       const transition = {
         state_id: targetStateName
       };
 
-      // Добавляем case если есть условие
-      const condition = edge.data?.case || edge.data?.condition;
-      if (condition) {
-        transition.case = condition;
-      } else {
-        transition.case = null;
-      }
-
-      // Добавляем variable если есть
-      const variable = edge.data?.variable;
+      // Добавляем variable первым (если есть)
       if (variable) {
         transition.variable = variable;
       }
 
-      transitions.push(transition);
+      // Добавляем case
+      transition.case = condition || null;
+
+      // Переупорядочиваем ключи: variable, case, state_id
+      const orderedTransition = {};
+      if (transition.variable) {
+        orderedTransition.variable = transition.variable;
+      }
+      orderedTransition.case = transition.case;
+      orderedTransition.state_id = transition.state_id;
+
+      transitions.push(orderedTransition);
     });
   }
 
@@ -212,9 +264,10 @@ function createTransitions(outgoingEdges, stateType, nodeIdToName) {
  * @param {Set} initialNodes - Множество начальных узлов
  * @param {Set} finalNodes - Множество конечных узлов
  * @param {Map} nodeIdToName - Карта nodeId -> state_name
+ * @param {Object} screens - Объект с данными экранов (screens[screenId])
  * @returns {StateModel}
  */
-function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName) {
+function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName, screens = {}) {
   const stateType = detectStateType(node);
   const nodeData = node.data || {};
   const outgoingEdges = allEdges.filter(e => e.source === node.id);
@@ -229,17 +282,39 @@ function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName) 
     expressions = createScreenExpressions(nodeData, outgoingEdges);
   }
 
-  // Создаем transitions
-  const transitions = createTransitions(outgoingEdges, stateType, nodeIdToName);
+  // Создаем transitions (передаем nodeData для извлечения variable)
+  const transitions = createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData);
 
-  return {
+  // Получаем screen данные для screen узлов
+  let screenData = {};
+  if (stateType === 'screen' && nodeData.screenId && screens[nodeData.screenId]) {
+    screenData = screens[nodeData.screenId];
+    console.log(`📄 [mapNodeToState] Including screen data for "${nodeData.label || node.id}" (screenId: ${nodeData.screenId})`, {
+      screenKeys: Object.keys(screenData),
+      hasSection: !!screenData.sections,
+      screenId: screenData.id
+    });
+  } else if (stateType === 'screen') {
+    console.warn(`⚠️ [mapNodeToState] Screen state without screen data: "${nodeData.label || node.id}"`, {
+      stateType,
+      hasScreenId: !!nodeData.screenId,
+      screenId: nodeData.screenId,
+      screenExists: nodeData.screenId ? !!screens[nodeData.screenId] : false,
+      availableScreens: Object.keys(screens)
+    });
+  }
+
+  const state = {
     state_type: stateType,
     name: nodeData.label || node.id,
+    screen: screenData,
     initial_state: initialNodes.has(node.id),
     final_state: finalNodes.has(node.id),
     expressions: expressions,
     transitions: transitions
   };
+
+  return state;
 }
 
 /**
@@ -312,16 +387,18 @@ function findInitialAndFinalNodes(nodes, edges) {
 
 /**
  * Основная функция преобразования BDUI graphData в StateModel[]
- * @param {Object} graphData - graphData из VirtualContext (nodes + edges)
+ * @param {Object} graphData - graphData из VirtualContext (nodes + edges + screens)
  * @param {Object} [initialContext] - Начальный контекст (необязательно)
  * @returns {{states: StateModel[], predefined_context: Object}}
  */
 export function mapGraphDataToWorkflow(graphData, initialContext = {}) {
-  const { nodes = [], edges = [] } = graphData;
+  const { nodes = [], edges = [], screens = {} } = graphData;
 
   console.log('🗺️ [workflowMapper] Starting graph to workflow conversion:', {
     nodesCount: nodes.length,
     edgesCount: edges.length,
+    screensCount: Object.keys(screens).length,
+    screenIds: Object.keys(screens),
     nodeIds: nodes.map(n => n.id),
     nodeLabels: nodes.map(n => n.data?.label || n.id)
   });
@@ -359,7 +436,7 @@ export function mapGraphDataToWorkflow(graphData, initialContext = {}) {
 
   // Преобразуем каждый узел в StateModel
   const states = nodes.map(node => 
-    mapNodeToState(node, edges, initialNodes, finalNodes, nodeIdToName)
+    mapNodeToState(node, edges, initialNodes, finalNodes, nodeIdToName, screens)
   );
 
   console.log('🗺️ [workflowMapper] Mapped states:', {

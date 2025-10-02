@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   applyContextPatch,
@@ -9,6 +9,12 @@ import {
 } from './utils/bindings';
 import SandboxScreenRenderer from './SandboxScreenRenderer';
 import ApiSandboxRunner from './ApiSandboxRunner';
+import ClientWorkflowRunner from './ClientWorkflowRunner';
+import { checkClientWorkflowHealth } from '../../services/clientWorkflowApi';
+import {
+  executeIntegrationNode,
+  getNextStateFromIntegration
+} from './utils/integrationStates';
 import ecommerceDashboard from './data/ecommerceDashboard.json';
 import avitoDemo from './data/avitoDemo.json';
 import {
@@ -184,62 +190,25 @@ const SandboxPage = () => {
   // Поддержка загрузки workflow через URL параметры
   const { clientSessionId, clientWorkflowId } = parseWorkflowUrlParams(searchParams);
   
-  // Состояние для workflow загруженного через API
+  // Состояние для workflow загруженного через API (legacy, теперь не используется для Client Workflow)
   const [workflowData, setWorkflowData] = useState(null);
-  const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [workflowError, setWorkflowError] = useState(null);
   
+  // API Modes: 'disabled', 'checking', 'legacy-ready', 'client-ready', 'error'
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
   const [apiData, setApiData] = useState(null);
   const [apiError, setApiError] = useState(null);
+  const [activeWorkflowId, setActiveWorkflowId] = useState(null); // Для Client Workflow API
   
-  // Загрузка workflow через API при наличии URL параметров
+  // ✅ ИСПРАВЛЕНИЕ: Если есть URL params с workflow_id, используем Client Workflow API напрямую
   useEffect(() => {
     if (!clientSessionId || !clientWorkflowId) {
       return;
     }
     
-    let cancelled = false;
-    
-    const fetchWorkflow = async () => {
-      setWorkflowLoading(true);
-      setWorkflowError(null);
-      
-      try {
-        const workflow = await loadWorkflow(clientSessionId, clientWorkflowId);
-        
-        if (!cancelled) {
-          setWorkflowData({
-            id: workflow.metadata.id,
-            name: workflow.metadata.name,
-            version: workflow.metadata.version,
-            nodes: workflow.nodes,
-            edges: workflow.edges,
-            screens: workflow.screens,
-            initialContext: workflow.initialContext,
-            variableSchemas: workflow.variableSchemas,
-          });
-          setApiMode('disabled'); // Отключаем API mode при загрузке workflow
-          toast.success(`Workflow "${workflow.metadata.name}" загружен успешно!`);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const errorMessage = error instanceof Error ? error.message : 'Не удалось загрузить workflow';
-          setWorkflowError(errorMessage);
-          toast.error(`Ошибка загрузки workflow: ${errorMessage}`);
-        }
-      } finally {
-        if (!cancelled) {
-          setWorkflowLoading(false);
-        }
-      }
-    };
-    
-    fetchWorkflow();
-    
-    return () => {
-      cancelled = true;
-    };
+    console.log('✅ [SandboxPage] URL params detected, using Client Workflow API mode');
+    // Устанавливаем workflow_id и переключаемся в client-ready режим
+    setActiveWorkflowId(clientWorkflowId);
+    setApiMode('client-ready');
   }, [clientSessionId, clientWorkflowId]);
   
   useEffect(() => {
@@ -255,7 +224,33 @@ const SandboxPage = () => {
 
     let cancelled = false;
 
-    const fetchStartScreen = async () => {
+    const checkApis = async () => {
+      // ✅ Если уже загружаем workflow через loadWorkflow, не используем Client Workflow API
+      if (clientSessionId && clientWorkflowId) {
+        console.log('⚠️ [SandboxPage] Workflow loading via URL params, skipping API mode');
+        // Оставляем режим 'checking' до завершения загрузки
+        return;
+      }
+      
+      // Сначала проверяем новый Client Workflow API
+      const isClientWorkflowAvailable = await checkClientWorkflowHealth();
+      
+      if (cancelled) return;
+      
+      if (isClientWorkflowAvailable) {
+        // Используем новый Client Workflow API
+        console.log('✅ [SandboxPage] Client Workflow API available');
+        // Определяем workflow_id (из доступных данных или дефолтный)
+        const currentProduct = workflowData || runtimeProduct || avitoDemo;
+        const workflowId = currentProduct?.id || 'default-workflow';
+        setActiveWorkflowId(workflowId);
+        setApiMode('client-ready');
+        setApiError(null);
+        return;
+      }
+      
+      // Fallback на legacy API
+      console.log('⚠️ [SandboxPage] Client Workflow API unavailable, trying legacy API');
       try {
         const response = await fetch('/api/start/');
         if (!response.ok) {
@@ -265,34 +260,36 @@ const SandboxPage = () => {
         if (!cancelled) {
           setApiData(data);
           setApiError(null);
-          setApiMode('ready');
+          setApiMode('legacy-ready');
+          console.log('✅ [SandboxPage] Legacy API available');
         }
       } catch (err) {
         if (!cancelled) {
           setApiError(err instanceof Error ? err.message : 'Не удалось подключиться к API');
           setApiMode('error');
+          console.log('❌ [SandboxPage] All APIs unavailable');
         }
       }
     };
 
-    fetchStartScreen();
+    checkApis();
 
     return () => {
       cancelled = true;
     };
-  }, [apiMode]);
+  }, [apiMode, workflowData, runtimeProduct, clientSessionId, clientWorkflowId]);
 
   const handleDisableApi = useCallback(() => {
     setApiMode('disabled');
   }, []);
 
   const handleRetryApi = useCallback(() => {
-    if (runtimeProduct || workflowData) {
+    if (runtimeProduct) {
       return;
     }
     setApiError(null);
     setApiMode('checking');
-  }, [runtimeProduct, workflowData]);
+  }, [runtimeProduct]);
 
   // Приоритет: workflowData > runtimeProduct > avitoDemo
   const product = workflowData || runtimeProduct || avitoDemo;
@@ -332,7 +329,8 @@ const SandboxPage = () => {
   }, [product, isOfflineMode]);
 
   const isLoaderVisible = apiMode === 'checking';
-  const isApiReady = apiMode === 'ready' && Boolean(apiData);
+  const isClientWorkflowReady = apiMode === 'client-ready' && Boolean(activeWorkflowId);
+  const isLegacyApiReady = apiMode === 'legacy-ready' && Boolean(apiData);
 
   const currentNode = useMemo(
     () => getNodeById(currentNodeId),
@@ -401,6 +399,56 @@ const SandboxPage = () => {
 
     return { type: 'empty' };
   }, [contextState, currentNode, currentScreen]);
+
+  // Автоматическое выполнение Integration States
+  useEffect(() => {
+    if (!currentNode) return;
+    if (!isOfflineMode) return; // Только для offline режима
+    
+    const nodeType = currentNode.type || currentNode.state_type;
+    if (nodeType !== 'integration') return;
+
+    console.log('[Integration] Detected integration node:', currentNode.id);
+
+    // Выполняем integration запросы
+    executeIntegrationNode(currentNode, contextState)
+      .then(result => {
+        console.log('[Integration] Execution result:', result);
+        
+        if (result.success) {
+          // Обновляем контекст с результатами
+          setContextState(result.context);
+          
+          // Добавляем в историю
+          setHistory(prev => [
+            ...prev,
+            {
+              nodeId: currentNode.id,
+              nodeName: currentNode.label || currentNode.name || currentNode.id,
+              action: 'integration',
+              variable: currentNode.expressions[0]?.variable,
+              timestamp: Date.now()
+            }
+          ]);
+          
+          // Переходим к следующему состоянию
+          const nextStateId = getNextStateFromIntegration(currentNode, result);
+          if (nextStateId) {
+            console.log('[Integration] Moving to next state:', nextStateId);
+            setTimeout(() => {
+              setCurrentNodeId(nextStateId);
+            }, 300); // Небольшая задержка для плавности
+          }
+        } else {
+          console.error('[Integration] Execution failed:', result.error);
+          toast.error(`Integration failed: ${result.error}`);
+        }
+      })
+      .catch(error => {
+        console.error('[Integration] Unexpected error:', error);
+        toast.error(`Integration error: ${error.message}`);
+      });
+  }, [currentNode, contextState, isOfflineMode]);
 
   useEffect(() => {
     const screenId = currentScreen?.id ?? currentNode?.screenId ?? currentNodeId;
@@ -697,45 +745,24 @@ const SandboxPage = () => {
     );
   }
 
-  if (isApiReady) {
+  // Новый Client Workflow API режим (приоритет)
+  if (isClientWorkflowReady) {
     return (
-      <ApiSandboxRunner
-        initialData={apiData}
+      <ClientWorkflowRunner
+        workflowId={activeWorkflowId}
+        initialContext={product?.initialContext || {}}
         onExit={handleDisableApi}
       />
     );
   }
 
-  // Отображаем загрузчик при загрузке workflow
-  if (workflowLoading) {
+  // Legacy API режим (fallback)
+  if (isLegacyApiReady) {
     return (
-      <div className="sandbox-page">
-        <div className="sandbox-loading">
-          <div className="sandbox-loading-spinner"></div>
-          <h2>Загрузка workflow...</h2>
-          <p>Пожалуйста, подождите</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Отображаем ошибку при неудачной загрузке workflow
-  if (workflowError) {
-    return (
-      <div className="sandbox-page">
-        <div className="sandbox-error">
-          <h2>Ошибка загрузки workflow</h2>
-          <p>{workflowError}</p>
-          <button 
-            type="button" 
-            className="sandbox-reset"
-            onClick={() => window.location.reload()}
-          >
-            <RotateCcw size={16} />
-            Попробовать снова
-          </button>
-        </div>
-      </div>
+      <ApiSandboxRunner
+        initialData={apiData}
+        onExit={handleDisableApi}
+      />
     );
   }
 
@@ -918,7 +945,8 @@ const SandboxPage = () => {
                     target: edge.target,
                     data: edge.data || {}
                   }))
-                ) || []
+                ) || [],
+                screens: product.screens || {}
               }}
               initialContext={contextState || product.initialContext || {}}
               productId={product.id || product.slug || product.name || 'sandbox'}

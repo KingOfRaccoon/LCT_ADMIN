@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -119,8 +119,20 @@ const sandboxApiProxyTarget = process.env.SANDBOX_API_PROXY?.trim() || 'http://l
 const isProxyEnabled = sandboxApiProxyTarget !== 'off';
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Загружаем переменные окружения из .env файлов
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  // Определяем базовый путь
+  // Development: '/' (из .env.development)
+  // Production: '/admin/panel' (из .env.production)
+  const basePath = env.VITE_BASE_PATH || '/';
+  
+  console.log(`🔧 [Vite] Building in ${mode} mode with base path: ${basePath}`);
+  
+  return {
   plugins: [react(), screenStorageApiPlugin(), graphStorageApiPlugin()],
+  base: basePath,
   server: isProxyEnabled
     ? {
         proxy: {
@@ -135,4 +147,5 @@ export default defineConfig({
         }
       }
     : undefined
+  };
 });

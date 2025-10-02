@@ -36,6 +36,8 @@ BDUI платформа требует системы аналитики для:
 
 Выбрана архитектура **localStorage + React Context** для аналитики.
 
+> **Примечание:** Client Session ID (для Client Workflow API) использует **in-memory storage** и обновляется при каждом F5. Это отдельная система от аналитики.
+
 ### Архитектура
 
 ```javascript

@@ -68,10 +68,19 @@ export const getContextValue = (context, path) => {
   for (let i = 0; i < segments.length; i += 1) {
     const segment = segments[i];
 
-    if (acc === undefined || acc === null) {
+    // Защита от null, undefined и строковых заглушек типа "None"
+    if (acc === undefined || acc === null || acc === 'None' || acc === 'null' || acc === 'undefined') {
       if (isSandboxDev) {
         // lightweight dev trace
         logger.debug('[sandbox] getContextValue stop', { path, segment, index: i, accumulator: acc });
+      }
+      return undefined;
+    }
+
+    // Если acc — примитив (строка/число/boolean), но не объект/массив, дальше идти нельзя
+    if (typeof acc !== 'object') {
+      if (isSandboxDev) {
+        logger.debug('[sandbox] getContextValue primitive stop', { path, segment, index: i, type: typeof acc, accumulator: acc });
       }
       return undefined;
     }

@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   applyContextPatch,
   cloneContext,
@@ -9,7 +9,14 @@ import {
 } from './utils/bindings';
 import SandboxScreenRenderer from './SandboxScreenRenderer';
 import ApiSandboxRunner from './ApiSandboxRunner';
+import ClientWorkflowRunner from './ClientWorkflowRunner';
+import { checkClientWorkflowHealth } from '../../services/clientWorkflowApi';
+import {
+  executeIntegrationNode,
+  getNextStateFromIntegration
+} from './utils/integrationStates';
 import ecommerceDashboard from './data/ecommerceDashboard.json';
+import avitoDemo from './data/avitoDemo.json';
 import {
   ArrowRight,
   GitBranch,
@@ -19,6 +26,9 @@ import {
   PlugZap
 } from 'lucide-react';
 import { useAnalytics } from '../../services/analytics';
+import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
+import { loadWorkflow, parseWorkflowUrlParams } from '../../utils/workflowApi';
+import toast from 'react-hot-toast';
 import './SandboxPage.css';
 
 const isPlainObject = (value) => (
@@ -170,12 +180,37 @@ const getInitialNodeId = (product) => (
 
 const SandboxPage = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { trackScreenView, finalizeScreenTiming } = useAnalytics();
+  
+  // Поддержка legacy способа передачи данных через location.state
   const runtimeProduct = location.state?.product;
   const runtimeSchemas = location.state?.variableSchemas;
+  
+  // Поддержка загрузки workflow через URL параметры
+  const { clientSessionId, clientWorkflowId } = parseWorkflowUrlParams(searchParams);
+  
+  // Состояние для workflow загруженного через API (legacy, теперь не используется для Client Workflow)
+  const [workflowData, setWorkflowData] = useState(null);
+  
+  // API Modes: 'disabled', 'checking', 'legacy-ready', 'client-ready', 'error'
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
   const [apiData, setApiData] = useState(null);
   const [apiError, setApiError] = useState(null);
+  const [activeWorkflowId, setActiveWorkflowId] = useState(null); // Для Client Workflow API
+  
+  // ✅ ИСПРАВЛЕНИЕ: Если есть URL params с workflow_id, используем Client Workflow API напрямую
+  useEffect(() => {
+    if (!clientSessionId || !clientWorkflowId) {
+      return;
+    }
+    
+    console.log('✅ [SandboxPage] URL params detected, using Client Workflow API mode');
+    // Устанавливаем workflow_id и переключаемся в client-ready режим
+    setActiveWorkflowId(clientWorkflowId);
+    setApiMode('client-ready');
+  }, [clientSessionId, clientWorkflowId]);
+  
   useEffect(() => {
     if (runtimeProduct && apiMode !== 'disabled') {
       setApiMode('disabled');
@@ -189,7 +224,33 @@ const SandboxPage = () => {
 
     let cancelled = false;
 
-    const fetchStartScreen = async () => {
+    const checkApis = async () => {
+      // ✅ Если уже загружаем workflow через loadWorkflow, не используем Client Workflow API
+      if (clientSessionId && clientWorkflowId) {
+        console.log('⚠️ [SandboxPage] Workflow loading via URL params, skipping API mode');
+        // Оставляем режим 'checking' до завершения загрузки
+        return;
+      }
+      
+      // Сначала проверяем новый Client Workflow API
+      const isClientWorkflowAvailable = await checkClientWorkflowHealth();
+      
+      if (cancelled) return;
+      
+      if (isClientWorkflowAvailable) {
+        // Используем новый Client Workflow API
+        console.log('✅ [SandboxPage] Client Workflow API available');
+        // Определяем workflow_id (из доступных данных или дефолтный)
+        const currentProduct = workflowData || runtimeProduct || avitoDemo;
+        const workflowId = currentProduct?.id || 'default-workflow';
+        setActiveWorkflowId(workflowId);
+        setApiMode('client-ready');
+        setApiError(null);
+        return;
+      }
+      
+      // Fallback на legacy API
+      console.log('⚠️ [SandboxPage] Client Workflow API unavailable, trying legacy API');
       try {
         const response = await fetch('/api/start/');
         if (!response.ok) {
@@ -199,22 +260,24 @@ const SandboxPage = () => {
         if (!cancelled) {
           setApiData(data);
           setApiError(null);
-          setApiMode('ready');
+          setApiMode('legacy-ready');
+          console.log('✅ [SandboxPage] Legacy API available');
         }
       } catch (err) {
         if (!cancelled) {
           setApiError(err instanceof Error ? err.message : 'Не удалось подключиться к API');
           setApiMode('error');
+          console.log('❌ [SandboxPage] All APIs unavailable');
         }
       }
     };
 
-    fetchStartScreen();
+    checkApis();
 
     return () => {
       cancelled = true;
     };
-  }, [apiMode]);
+  }, [apiMode, workflowData, runtimeProduct, clientSessionId, clientWorkflowId]);
 
   const handleDisableApi = useCallback(() => {
     setApiMode('disabled');
@@ -228,7 +291,8 @@ const SandboxPage = () => {
     setApiMode('checking');
   }, [runtimeProduct]);
 
-  const product = runtimeProduct || ecommerceDashboard;
+  // Приоритет: workflowData > runtimeProduct > avitoDemo
+  const product = workflowData || runtimeProduct || avitoDemo;
   const nodesById = useMemo(() => {
     const map = new Map();
     (product?.nodes ?? []).forEach((node) => {
@@ -238,10 +302,10 @@ const SandboxPage = () => {
     });
     return map;
   }, [product]);
-  const isOfflineMode = Boolean(runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
+  const isOfflineMode = Boolean(workflowData || runtimeProduct || apiMode === 'disabled' || apiMode === 'error');
   const variableSchemas = useMemo(
-    () => runtimeSchemas || product.variableSchemas || {},
-    [product, runtimeSchemas]
+    () => workflowData?.variableSchemas || runtimeSchemas || product.variableSchemas || {},
+    [product, runtimeSchemas, workflowData]
   );
   const getNodeById = useCallback((nodeId) => nodesById.get(nodeId) ?? null, [nodesById]);
   const initialNodeId = useMemo(() => getInitialNodeId(product), [product]);
@@ -265,7 +329,8 @@ const SandboxPage = () => {
   }, [product, isOfflineMode]);
 
   const isLoaderVisible = apiMode === 'checking';
-  const isApiReady = apiMode === 'ready' && Boolean(apiData);
+  const isClientWorkflowReady = apiMode === 'client-ready' && Boolean(activeWorkflowId);
+  const isLegacyApiReady = apiMode === 'legacy-ready' && Boolean(apiData);
 
   const currentNode = useMemo(
     () => getNodeById(currentNodeId),
@@ -334,6 +399,56 @@ const SandboxPage = () => {
 
     return { type: 'empty' };
   }, [contextState, currentNode, currentScreen]);
+
+  // Автоматическое выполнение Integration States
+  useEffect(() => {
+    if (!currentNode) return;
+    if (!isOfflineMode) return; // Только для offline режима
+    
+    const nodeType = currentNode.type || currentNode.state_type;
+    if (nodeType !== 'integration') return;
+
+    console.log('[Integration] Detected integration node:', currentNode.id);
+
+    // Выполняем integration запросы
+    executeIntegrationNode(currentNode, contextState)
+      .then(result => {
+        console.log('[Integration] Execution result:', result);
+        
+        if (result.success) {
+          // Обновляем контекст с результатами
+          setContextState(result.context);
+          
+          // Добавляем в историю
+          setHistory(prev => [
+            ...prev,
+            {
+              nodeId: currentNode.id,
+              nodeName: currentNode.label || currentNode.name || currentNode.id,
+              action: 'integration',
+              variable: currentNode.expressions[0]?.variable,
+              timestamp: Date.now()
+            }
+          ]);
+          
+          // Переходим к следующему состоянию
+          const nextStateId = getNextStateFromIntegration(currentNode, result);
+          if (nextStateId) {
+            console.log('[Integration] Moving to next state:', nextStateId);
+            setTimeout(() => {
+              setCurrentNodeId(nextStateId);
+            }, 300); // Небольшая задержка для плавности
+          }
+        } else {
+          console.error('[Integration] Execution failed:', result.error);
+          toast.error(`Integration failed: ${result.error}`);
+        }
+      })
+      .catch(error => {
+        console.error('[Integration] Unexpected error:', error);
+        toast.error(`Integration error: ${error.message}`);
+      });
+  }, [currentNode, contextState, isOfflineMode]);
 
   useEffect(() => {
     const screenId = currentScreen?.id ?? currentNode?.screenId ?? currentNodeId;
@@ -577,19 +692,29 @@ const SandboxPage = () => {
 
   const handleNodeEvent = useCallback((eventName) => {
     if (!eventName || !currentNode) {
+      console.log('[SandboxPage] handleNodeEvent: missing eventName or currentNode', { eventName, currentNode: currentNode?.id });
       return;
     }
 
     const normalized = eventName.trim();
     if (!normalized) {
+      console.log('[SandboxPage] handleNodeEvent: empty eventName after trim');
       return;
     }
+
+    console.log('[SandboxPage] handleNodeEvent:', {
+      eventName: normalized,
+      nodeId: currentNode.id,
+      availableEdges: currentNode.edges?.map(e => ({ id: e.id, event: e.event, target: e.target }))
+    });
 
     const edge = (currentNode.edges ?? []).find((candidate) => candidate && candidate.event === normalized);
     if (!edge) {
+      console.warn('[SandboxPage] No matching edge found for event:', normalized);
       return;
     }
 
+    console.log('[SandboxPage] Found matching edge:', edge.id, '-> target:', edge.target);
     handleEdgeRun(edge);
   }, [currentNode, handleEdgeRun]);
 
@@ -620,7 +745,19 @@ const SandboxPage = () => {
     );
   }
 
-  if (isApiReady) {
+  // Новый Client Workflow API режим (приоритет)
+  if (isClientWorkflowReady) {
+    return (
+      <ClientWorkflowRunner
+        workflowId={activeWorkflowId}
+        initialContext={product?.initialContext || {}}
+        onExit={handleDisableApi}
+      />
+    );
+  }
+
+  // Legacy API режим (fallback)
+  if (isLegacyApiReady) {
     return (
       <ApiSandboxRunner
         initialData={apiData}
@@ -796,10 +933,32 @@ const SandboxPage = () => {
             <h1>{product.name}</h1>
             <p>{product.description}</p>
           </div>
-          <button type="button" className="sandbox-reset" onClick={handleReset}>
-            <RotateCcw size={16} />
-            Сбросить сценарий
-          </button>
+          <div className="sandbox-header-actions">
+            {/* Кнопка экспорта workflow */}
+            <WorkflowExportButton
+              graphData={{
+                nodes: product.nodes || [],
+                edges: product.nodes?.flatMap(node => 
+                  (node.edges || []).map(edge => ({
+                    id: edge.id,
+                    source: node.id,
+                    target: edge.target,
+                    data: edge.data || {}
+                  }))
+                ) || [],
+                screens: product.screens || {}
+              }}
+              initialContext={contextState || product.initialContext || {}}
+              productId={product.id || product.slug || product.name || 'sandbox'}
+              label="Export"
+              size={16}
+            />
+            
+            <button type="button" className="sandbox-reset" onClick={handleReset}>
+              <RotateCcw size={16} />
+              Сбросить сценарий
+            </button>
+          </div>
         </div>
 
         <div className="sandbox-status">

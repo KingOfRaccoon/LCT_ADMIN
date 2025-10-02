@@ -48,6 +48,13 @@
 - **Widget Presets**: готовые стилевые пресеты для кнопок, полей, списков с поддержкой вариантов (primary/secondary) и размеров
 - **Screen Renderer**: поддержка legacy формата `components` и нового `sections` с вложенными children
 
+### Декларативная архитектура (2025) 🆕
+- **Events in Edges**: события описаны в рёбрах через поля `event` и `keepInputs` — никакого хардкода в сервере
+- **Action Nodes**: бизнес-логика вынесена в JSON через `data.actionType` и `data.config` (например, `modify-cart-item`)
+- **Universal Server**: сервер читает конфигурацию и интерпретирует — не зависит от конкретных пресетов
+- **Zero Hardcode**: добавление нового события не требует изменений в коде, только в JSON
+- **См. документацию**: [Декларативный рефакторинг](./docs/declarative-refactoring.md) — подробный отчёт о миграции логики в JSON
+
 ## 🏗️ Архитектура
 
 ### Диаграмма взаимодействия компонентов
@@ -139,6 +146,25 @@ src/
 - **Node.js** ≥ 20.19.0
 - **npm** ≥ 10.9.0
 
+### Деплой на поддомен 🌐
+
+Проект настроен для деплоя на `https://sandkittens.me/admin/panel`:
+
+```bash
+# Production build (с базовым путем /admin/panel)
+npm run build
+
+# Preview локально
+npm run preview
+# Открыть: http://localhost:4173/admin/panel
+```
+
+**Конфигурация:**
+- `.env.development` — для локальной разработки (base: `/`)
+- `.env.production` — для продакшена (base: `/admin/panel`)
+
+Подробнее: [docs/DEPLOY_SUBDOMAIN.md](./docs/DEPLOY_SUBDOMAIN.md)
+
 ### Установка
 
 ```bash
@@ -148,34 +174,85 @@ cd TeST
 
 # Установить зависимости
 npm install
+```
 
+### Вариант 1: Только Frontend (без Sandbox API)
+
+```bash
 # Запустить dev-сервер
 npm run dev
 # → http://localhost:5173
 
-# Production build
-npm run build
-
-# Превью production сборки
-npm run preview
+# Sandbox и Preview будут работать с статичными JSON файлами
+# из src/pages/Sandbox/data/
 ```
 
-### Запуск Sandbox API (опционально)
+### Вариант 2: Frontend + Sandbox API ✅ Рекомендуется для Preview
 
-**JavaScript backend:**
+**Для полноценной работы Preview страницы** нужны **два сервера**:
+
+**Терминал 1 - Sandbox JS Server:**
 ```bash
 npm run sandbox:server
 # → http://localhost:5050
 # Переменная окружения: SANDBOX_PRESET=avitoDemo (default) или ecommerceDashboard
 ```
 
-**Python backend (FastAPI):**
+**Терминал 2 - Vite Dev Server:**
+```bash
+npm run dev
+# → http://localhost:5173
+# Автоматически проксирует /api/start и /api/action на localhost:5050
+```
+
+**Проверка работы:**
+- http://localhost:5173/preview - ✅ Работает с локальным JS сервером
+- http://localhost:5173/sandbox - ✅ Работает с офлайн данными или API
+
+> 📖 **Подробная документация:** [docs/SANDBOX_SERVER_SETUP.md](./docs/SANDBOX_SERVER_SETUP.md)
+
+### Вариант 3: Python Backend (FastAPI)
+
 ```bash
 cd server
 pip install -r requirements.txt
+
+# Запуск Sandbox API (порт 8000)
 uvicorn main:app --reload
 # → http://localhost:8000
 ```
+
+### Production Build
+
+```bash
+npm run build
+npm run preview
+# → http://localhost:4173
+```
+
+> **⚠️ Важно про Workflow Export:**  
+> 
+> **Workflow Server — это отдельный проект**, который должен быть запущен отдельно.  
+> Текущий `server/main.py` содержит только **Sandbox API**.
+> 
+> **Для экспорта workflow:**
+> 
+> 1. **Запустите ваш Workflow Server** (из другого проекта)
+> 2. **Настройте URL в BDUI Admin:**
+>    ```javascript
+>    // В DevTools Console:
+>    localStorage.setItem('workflowServerUrl', 'http://your-workflow-server:8000');
+>    ```
+> 3. **Или используйте mock-режим** для тестирования без сервера:
+>    ```javascript
+>    localStorage.setItem('workflowServerUrl', 'mock');
+>    ```
+> 
+> **📚 Полная документация:**
+> - **[WORKFLOW_FINAL_SETUP.md](./WORKFLOW_FINAL_SETUP.md)** ⭐ — Быстрый старт
+> - [WORKFLOW_SERVER_SETUP.md](./WORKFLOW_SERVER_SETUP.md) — Требуемые эндпоинты
+> - [WORKFLOW_LOGGING_GUIDE.md](./WORKFLOW_LOGGING_GUIDE.md) — Отладка через логи
+> - [WORKFLOW_VALIDATION_DEBUG.md](./WORKFLOW_VALIDATION_DEBUG.md) — Правила валидации
 
 ### Component Playground (Ladle)
 
@@ -364,11 +441,70 @@ Button(
 
 ## 📡 API и контракты
 
+### 🆕 Workflow Server Integration
+
+**Полная интеграция с серверным Workflow API** — экспорт BDUI графов в серверный формат StateModel из всех компонентов платформы.
+
+**✨ Что реализовано:**
+- ✅ **useWorkflowApi Hook** — универсальный React hook для workflow операций
+- ✅ **WorkflowSettings Component** — UI для настройки сервера, health check, автосохранение
+- ✅ **WorkflowExportButton** — переиспользуемая кнопка экспорта с валидацией и tooltip
+- ✅ **Автоматический маппинг** — преобразование graphData (nodes/edges) в StateModel[]
+- ✅ **Валидация контрактов** — проверка всех обязательных полей перед отправкой
+- ✅ **Типы состояний** — technical, integration, screen, service
+
+**🎯 Интегрированные компоненты:**
+- **ProductOverview** — экспорт всего продукта с graphData и variables
+- **ScreenEditor** — экспорт визуального графа React Flow
+- **SandboxPage** — экспорт текущего состояния тестирования
+- **PreviewPage** — экспорт текущего screen и context
+- **ScreenBuilder** — экспорт layout компонентов экрана
+
+**📚 Документация:**
+- [Полное руководство по интеграции](./WORKFLOW_INTEGRATION_COMPLETE.md) — **⭐ ГЛАВНЫЙ ДОКУМЕНТ** ⭐
+- [Руководство для разработчиков](./docs/integration-guide.md) — контракты и типы
+- [Примеры использования](./docs/workflow-integration-example.md) — практические примеры
+- [Sandbox/Preview специфика](./docs/workflow-sandbox-preview-integration.md) — детали интеграции
+- [Quick Start](./docs/workflow-integration-readme.md) — быстрый старт
+
+**🛠️ Ключевые файлы:**
+- `src/hooks/useWorkflowApi.js` — React hook для workflow операций
+- `src/components/WorkflowSettings/` — UI компонент настроек сервера
+- `src/components/WorkflowExportButton/` — универсальная кнопка экспорта
+- `src/types/workflowContract.js` — JSDoc типы для StateModel
+- `src/utils/workflowMapper.js` — конвертер BDUI → StateModel
+- `src/services/workflowApi.js` — API клиент с валидацией
+
+**🚀 Использование:**
+```jsx
+import { useWorkflowApi } from './hooks/useWorkflowApi';
+import { WorkflowExportButton } from './components/WorkflowExportButton/WorkflowExportButton';
+
+// В любом компоненте
+const workflow = useWorkflowApi();
+
+// Или используйте готовую кнопку
+<WorkflowExportButton
+  graphData={graphData}
+  initialContext={context}
+  productId="my-product"
+  label="Export Workflow"
+/>
+```
+
+**⚙️ Настройка:**
+```javascript
+// localStorage settings
+localStorage.setItem('workflow_server_url', 'http://127.0.0.1:8000');
+localStorage.setItem('workflow_auto_save', 'true');
+```
+
 ### REST API (Sandbox Servers)
 
 **Endpoints:**
 - `POST /api/start` — инициализация продукта, возвращает начальный экран и контекст
 - `POST /api/action` — обработка события (edgeId), применение contextPatch, возврат следующего экрана
+- `POST /workflow/save` 🆕 — сохранение workflow в серверный формат StateModel
 
 **Request format (POST /api/action):**
 ```json

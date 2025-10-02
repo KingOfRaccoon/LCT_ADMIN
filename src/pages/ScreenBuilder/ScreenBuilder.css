@@ -500,6 +500,34 @@
   cursor: not-allowed;
 }
 
+/* Checkbox Styles */
+.canvas-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.canvas-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #007AFF;
+  border-radius: 4px;
+}
+
+.canvas-checkbox input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.canvas-checkbox-label {
+  font-size: 15px;
+  color: #000000;
+  font-weight: 400;
+}
+
 .canvas-text {
   color: var(--widget-text-color, #1e293b);
   font-size: var(--widget-text-font-size, 16px);

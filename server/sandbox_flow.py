@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -10,7 +11,8 @@ from .bindings import apply_context_patch, get_context_value, is_binding, resolv
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-DATASET_PATH = ROOT_DIR / "src/pages/Sandbox/data/ecommerceDashboard.json"
+PRESET_NAME = os.environ.get("SANDBOX_PRESET", "avitoDemo")
+DATASET_PATH = ROOT_DIR / f"src/pages/Sandbox/data/{PRESET_NAME}.json"
 
 try:
     with DATASET_PATH.open("r", encoding="utf-8") as dataset_file:
@@ -43,14 +45,42 @@ for node in _PRODUCT_DATA.get("nodes", []) or []:
         _EDGE_REGISTRY[edge["id"]] = edge_copy
 
 
+def _find_start_node() -> Optional[str]:
+    """Find the start node dynamically from the dataset."""
+    for node_id, node in _NODE_REGISTRY.items():
+        if node.get("start") is True:
+            return node_id
+    # Fallback to first node if no start node marked
+    return next(iter(_NODE_REGISTRY.keys())) if _NODE_REGISTRY else None
+
+
+START_NODE_ID = _find_start_node()
+
+
 DEFAULT_INPUTS: Dict[str, str] = {"email": ""}
 
 
-EVENT_RULES: Dict[str, Dict[str, Any]] = {
-    "checkemail": {"edge_id": "edge-email-submit", "source_node": "email-entry", "keep_inputs": True},
-    "retryfromsuccess": {"edge_id": "edge-valid-retry", "source_node": "email-valid", "keep_inputs": False},
-    "retryfromerror": {"edge_id": "edge-invalid-retry", "source_node": "email-invalid", "keep_inputs": False}
-}
+# Configure EVENT_RULES based on preset
+if PRESET_NAME == "ecommerceDashboard":
+    EVENT_RULES: Dict[str, Dict[str, Any]] = {
+        "checkemail": {"edge_id": "edge-email-submit", "source_node": "email-entry", "keep_inputs": True},
+        "retryfromsuccess": {"edge_id": "edge-valid-retry", "source_node": "email-valid", "keep_inputs": False},
+        "retryfromerror": {"edge_id": "edge-invalid-retry", "source_node": "email-invalid", "keep_inputs": False}
+    }
+else:
+    # Avito demo events
+    EVENT_RULES: Dict[str, Dict[str, Any]] = {
+        "loadcomplete": {"edge_id": "edge-load-complete", "source_node": "loading", "keep_inputs": False},
+        "incrementitem": {"edge_id": "edge-increment-item", "source_node": "cart-main", "keep_inputs": True},
+        "decrementitem": {"edge_id": "edge-decrement-item", "source_node": "cart-main", "keep_inputs": True},
+        "removeitem": {"edge_id": "edge-remove-item", "source_node": "cart-main", "keep_inputs": True},
+        "undoremove": {"edge_id": "edge-undo-remove", "source_node": "cart-main", "keep_inputs": True},
+        "addrecommended": {"edge_id": "edge-add-recommended", "source_node": "cart-main", "keep_inputs": True},
+        "selectall": {"edge_id": "edge-select-all", "source_node": "cart-main", "keep_inputs": True},
+        "clearall": {"edge_id": "edge-clear-all", "source_node": "cart-main", "keep_inputs": True},
+        "checkout": {"edge_id": "edge-checkout", "source_node": "cart-main", "keep_inputs": True},
+        "help": {"edge_id": "edge-help", "source_node": "cart-main", "keep_inputs": True}
+    }
 
 
 _BUTTON_EVENT_INJECTIONS: Dict[str, Dict[str, str]] = {}
@@ -364,9 +394,11 @@ def _extract_form_values(params: Dict[str, Any]) -> Dict[str, str]:
 
 
 def start_response() -> Dict[str, Any]:
+    if not START_NODE_ID:
+        raise HTTPException(status_code=500, detail="No start node found in dataset")
     core_context = _clone_base_context()
-    context = _build_api_context(core_context, DEFAULT_INPUTS, _state_overrides_for_node("email-entry"))
-    screen_id = _resolve_screen_id("email-entry")
+    context = _build_api_context(core_context, DEFAULT_INPUTS, _state_overrides_for_node(START_NODE_ID))
+    screen_id = _resolve_screen_id(START_NODE_ID)
     return _make_screen_response(screen_id, context)
 
 

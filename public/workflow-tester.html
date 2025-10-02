@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow API Tester</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    h1 {
+      margin-bottom: 8px;
+      color: #1e293b;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #334155;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 32px;
+    }
+    
+    button {
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-sandbox {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-preview {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .example {
+      background: #f1f5f9;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 24px;
+    }
+    
+    .example-title {
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .example-code {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      color: #475569;
+      word-break: break-all;
+    }
+    
+    .info {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    
+    .info-text {
+      color: #1e40af;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Workflow API Tester</h1>
+    <p class="subtitle">Тестирование загрузки workflow для Sandbox и Preview</p>
+    
+    <div class="info">
+      <div class="info-text">
+        <strong>Формат URL:</strong><br>
+        /sandbox?session_id=XXX&workflow_id=YYY<br>
+        /preview?session_id=XXX&workflow_id=YYY
+      </div>
+    </div>
+    
+    <form id="workflowForm">
+      <div class="form-group">
+        <label for="sessionId">Client Session ID</label>
+        <input 
+          type="text" 
+          id="sessionId" 
+          name="sessionId" 
+          placeholder="1234567890"
+          value="1234567890"
+          required
+        />
+      </div>
+      
+      <div class="form-group">
+        <label for="workflowId">Client Workflow ID</label>
+        <input 
+          type="text" 
+          id="workflowId" 
+          name="workflowId" 
+          placeholder="68dc7bc60335a481514bbb4c"
+          value="68dc7bc60335a481514bbb4c"
+          required
+        />
+      </div>
+      
+      <div class="button-group">
+        <button type="button" class="btn-sandbox" onclick="openSandbox()">
+          🎮 Открыть в Sandbox
+        </button>
+        <button type="button" class="btn-preview" onclick="openPreview()">
+          👁️ Открыть в Preview
+        </button>
+      </div>
+    </form>
+    
+    <div class="example">
+      <div class="example-title">📋 Примеры значений:</div>
+      <div class="example-code">
+        session_id: 1234567890<br>
+        workflow_id: 68dc7bc60335a481514bbb4c
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    function getFormValues() {
+      const sessionId = document.getElementById('sessionId').value.trim();
+      const workflowId = document.getElementById('workflowId').value.trim();
+      
+      if (!sessionId || !workflowId) {
+        alert('Пожалуйста, заполните оба поля!');
+        return null;
+      }
+      
+      return { sessionId, workflowId };
+    }
+    
+    function openSandbox() {
+      const values = getFormValues();
+      if (!values) return;
+      
+      const url = `/sandbox?session_id=${encodeURIComponent(values.sessionId)}&workflow_id=${encodeURIComponent(values.workflowId)}`;
+      window.open(url, '_blank');
+    }
+    
+    function openPreview() {
+      const values = getFormValues();
+      if (!values) return;
+      
+      const url = `/preview?session_id=${encodeURIComponent(values.sessionId)}&workflow_id=${encodeURIComponent(values.workflowId)}`;
+      window.open(url, '_blank');
+    }
+    
+    // Автофокус на первое поле
+    document.getElementById('sessionId').focus();
+  </script>
+</body>
+</html>

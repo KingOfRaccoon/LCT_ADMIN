@@ -17,9 +17,11 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
+import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
 import toast from 'react-hot-toast';
 import './ProductOverview.css';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
+import { loadAvitoDemoAsGraphData, convertAvitoDemoScreensToArray } from '../../utils/avitoDemoConverter';
 
 const ProductOverview = () => {
   const { productId } = useParams();
@@ -32,7 +34,11 @@ const ProductOverview = () => {
     deleteScreen,
     setCurrentScreen,
     setScreens,
-    updateApiEndpointsInGraph
+    updateApiEndpointsInGraph,
+    graphData,
+    variables,
+    setGraphData,
+    setVariableSchemas
   } = useVirtualContext();
 
   // Local state for product metadata editing
@@ -65,39 +71,9 @@ const ProductOverview = () => {
     }
   }, [globalSettings.apiBaseUrl, updateApiEndpointsInGraph]);
 
-  // Mock screens data
-  const [productScreens, setProductScreens] = useState([
-    {
-      id: 'start',
-      name: 'Login Screen',
-      type: 'form',
-      description: 'User authentication form with email and password',
-      order: 1,
-      components: 3,
-      actions: 2,
-      status: 'complete'
-    },
-    {
-      id: 'dashboard',
-      name: 'Dashboard',
-      type: 'display',
-      description: 'Main dashboard with analytics and navigation',
-      order: 2,
-      components: 8,
-      actions: 5,
-      status: 'draft'
-    },
-    {
-      id: 'error-screen',
-      name: 'Error Screen',
-      type: 'system',
-      description: 'Displays authentication errors and retry options',
-      order: 3,
-      components: 4,
-      actions: 1,
-      status: 'draft'
-    }
-  ]);
+  // Screens data - будет загружено из JSON или mock данных
+  const [productScreens, setProductScreens] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   const [screenPendingDelete, setScreenPendingDelete] = useState(null);
 
@@ -106,18 +82,39 @@ const ProductOverview = () => {
   }, [productScreens, setScreens]);
 
   useEffect(() => {
-    // In real app, fetch product data by ID
-    if (currentProduct && currentProduct.id === productId) {
-      setProductMeta({
-        name: currentProduct.name,
-        version: currentProduct.version,
-        description: currentProduct.description,
-        theme: currentProduct.theme || 'light',
-        permissions: currentProduct.permissions || [],
-        integrations: currentProduct.integrations || []
-      });
+    // Загружаем данные по productId (независимо от currentProduct)
+    if (productId === 'avito-cart-demo') {
+      setIsLoadingData(true);
+      loadAvitoDemoAsGraphData()
+        .then((data) => {
+          setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
+          setVariableSchemas(data.variableSchemas);
+          
+          // Преобразуем screens в массив для ProductOverview
+          const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
+          setProductScreens(screensArray);
+          
+          const mockProduct = {
+            id: productId,
+            name: 'Авито — Корзина',
+            version: '1.0.0',
+            description: 'Демонстрационный сценарий корзины Avito с 11 экранами и 25 действиями',
+            theme: 'light',
+            permissions: ['admin', 'viewer'],
+            integrations: ['avito-api']
+          };
+          setProduct(mockProduct);
+          setProductMeta(mockProduct);
+          setIsLoadingData(false);
+          toast.success('avitoDemo загружен успешно!');
+        })
+        .catch((error) => {
+          console.error('Failed to load avitoDemo:', error);
+          setIsLoadingData(false);
+          toast.error('Ошибка загрузки avitoDemo: ' + error.message);
+        });
     } else {
-      // Mock loading product data
+      // Mock loading product data для обычных продуктов
       const mockProduct = {
         id: productId,
         name: 'E-commerce Dashboard',
@@ -129,8 +126,43 @@ const ProductOverview = () => {
       };
       setProduct(mockProduct);
       setProductMeta(mockProduct);
+      
+      // Загружаем mock экраны для обычных продуктов
+      const mockScreens = [
+        {
+          id: 'start',
+          name: 'Login Screen',
+          type: 'form',
+          description: 'User authentication form with email and password',
+          order: 1,
+          components: 3,
+          actions: 2,
+          status: 'complete'
+        },
+        {
+          id: 'dashboard',
+          name: 'Dashboard',
+          type: 'display',
+          description: 'Main dashboard with analytics and navigation',
+          order: 2,
+          components: 8,
+          actions: 5,
+          status: 'draft'
+        },
+        {
+          id: 'error-screen',
+          name: 'Error Screen',
+          type: 'system',
+          description: 'Displays authentication errors and retry options',
+          order: 3,
+          components: 4,
+          actions: 1,
+          status: 'draft'
+        }
+      ];
+      setProductScreens(mockScreens);
     }
-  }, [productId, currentProduct, setProduct]);
+  }, [productId, setProduct, setGraphData, setVariableSchemas]);
 
   const handleSaveMetadata = () => {
     const updatedProduct = { ...currentProduct, ...productMeta };
@@ -256,6 +288,15 @@ const ProductOverview = () => {
             </div>
           ) : (
             <div className="edit-actions">
+              {/* Кнопка экспорта workflow */}
+              <WorkflowExportButton
+                graphData={graphData}
+                initialContext={variables || {}}
+                productId={productId}
+                label="Export Workflow"
+                className="export-workflow-btn"
+              />
+              
               <button 
                 className="btn btn-secondary"
                 onClick={() => setIsEditing(true)}
@@ -345,34 +386,54 @@ const ProductOverview = () => {
             </button>
           </div>
 
-          <div className="screens-flow">
-            {productScreens.map((screen) => {
-              const IconComponent = getScreenTypeIcon(screen.type);
-              
-              return (
-                <div key={screen.id} className="screen-flow-item">
-                  <div className="screen-card">
-                    <div className="screen-icon">
-                      <IconComponent size={24} />
-                    </div>
-                    
-                    <div 
-                      className="screen-content"
-                      onClick={() => handleBuildScreen(screen)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="screen-header">
-                        <h3>{screen.name}</h3>
-                        {getStatusBadge(screen.status)}
+          {isLoadingData ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '48px', 
+              color: '#64748b',
+              fontSize: '16px'
+            }}>
+              <div style={{ marginBottom: '12px' }}>⏳ Загрузка данных avitoDemo...</div>
+              <div style={{ fontSize: '14px' }}>Пожалуйста, подождите</div>
+            </div>
+          ) : productScreens.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '48px', 
+              color: '#94a3b8',
+              fontSize: '16px'
+            }}>
+              Нет экранов для отображения
+            </div>
+          ) : (
+            <div className="screens-flow">
+              {productScreens.map((screen) => {
+                const IconComponent = getScreenTypeIcon(screen.type);
+                
+                return (
+                  <div key={screen.id} className="screen-flow-item">
+                    <div className="screen-card">
+                      <div className="screen-icon">
+                        <IconComponent size={24} />
                       </div>
                       
-                      <p className="screen-description">{screen.description}</p>
+                      <div 
+                        className="screen-content"
+                        onClick={() => handleBuildScreen(screen)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="screen-header">
+                          <h3>{screen.name}</h3>
+                          {getStatusBadge(screen.status)}
+                        </div>
                       
-                      <div className="screen-stats">
-                        <span>{screen.components} components</span>
-                        <span>{screen.actions} actions</span>
+                        <p className="screen-description">{screen.description}</p>
+                        
+                        <div className="screen-stats">
+                          <span>{screen.components} components</span>
+                          <span>{screen.actions} actions</span>
+                        </div>
                       </div>
-                    </div>
                     
                     <div className="screen-actions">
                       <button
@@ -411,6 +472,7 @@ const ProductOverview = () => {
               );
             })}
           </div>
+        )}
         </div>
 
         {/* Global Settings Sidebar */}

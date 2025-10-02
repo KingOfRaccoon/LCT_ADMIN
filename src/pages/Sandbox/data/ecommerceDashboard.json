@@ -81,6 +81,7 @@
           "id": "edge-email-submit",
           "label": "Проверить email",
           "event": "checkEmail",
+          "keepInputs": true,
           "summary": "Передаёт введённый email в технический узел проверки",
           "target": "validate-email",
           "contextPatch": {
@@ -174,6 +175,7 @@
           "id": "edge-valid-retry",
           "label": "Проверить другой email",
           "event": "retryFromSuccess",
+          "keepInputs": false,
           "summary": "Возвращает на экран ввода и очищает состояние",
           "target": "email-entry",
           "contextPatch": {
@@ -196,6 +198,7 @@
           "id": "edge-invalid-retry",
           "label": "Исправить email",
           "event": "retryFromError",
+          "keepInputs": false,
           "summary": "Возвращает на экран ввода для новой проверки",
           "target": "email-entry",
           "contextPatch": {

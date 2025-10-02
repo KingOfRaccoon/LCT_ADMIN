@@ -11,10 +11,16 @@ import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 
+// Определяем basename для React Router
+// import.meta.env.BASE_URL автоматически берётся из vite.config.js (base)
+// Development: '/' (из .env.development)
+// Production: '/admin/panel' (из .env.production)
+const basename = import.meta.env.BASE_URL;
+
 function App() {
   return (
     <VirtualContextProvider>
-      <Router>
+      <Router basename={basename}>
         <div className="app">
           <Toaster position="top-right" />
           <Layout>

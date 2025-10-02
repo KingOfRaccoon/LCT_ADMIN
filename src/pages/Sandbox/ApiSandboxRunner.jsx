@@ -159,7 +159,7 @@ const ApiSandboxRunner = ({ initialData, onExit }) => {
         id: `${Date.now()}-${eventName}`,
         event: eventName,
         timestamp: new Date().toISOString(),
-        inputs: { ...formValues, ...eventParams },
+        context: { ...formValues, ...eventParams },
         screenId: data?.screen?.id ?? null
       });
     } catch (err) {

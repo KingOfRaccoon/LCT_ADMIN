@@ -271,7 +271,7 @@ export class WorkflowAPI {
    */
   async healthCheck() {
     try {
-      const response = await fetch(`${this.baseUrl}/health`, {
+      const response = await fetch(`${this.baseUrl}/healthcheck`, {
         method: 'GET',
       });
       return response.ok;

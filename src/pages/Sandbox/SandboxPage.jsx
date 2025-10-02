@@ -197,7 +197,7 @@ const SandboxPage = () => {
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
   const [apiData, setApiData] = useState(null);
   const [apiError, setApiError] = useState(null);
-  const [activeWorkflowId, setActiveWorkflowId] = useState(null); // Для Client Workflow API
+  const [activeWorkflowId, setActiveWorkflowId] = useState("68dedc98ea73d715d90e40dd"); // Для Client Workflow API
   
   // ✅ ИСПРАВЛЕНИЕ: Если есть URL params с workflow_id, используем Client Workflow API напрямую
   useEffect(() => {

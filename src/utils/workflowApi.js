@@ -170,7 +170,7 @@ export function parseWorkflowUrlParams(searchParams) {
     
   const result = {
     clientSessionId: sessionId || getClientSessionId(), // ✅ FIX: используем getClientSessionId() вместо generateSessionId()
-    clientWorkflowId: workflowId || "68dd68fe8341ae5cb6c60024",
+    clientWorkflowId: workflowId || "68dedc98ea73d715d90e40dd",
   };
   
   console.log('[parseWorkflowUrlParams] Result:', result);

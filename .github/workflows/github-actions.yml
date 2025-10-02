@@ -32,6 +32,23 @@ jobs:
         with:
           name: react-app
       
+      # ДОБАВИТЬ: Подготовка директории ПЕРЕД SCP
+      - name: Prepare target directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Создаем директорию если не существует
+            sudo mkdir -p /var/www/sandkittens-frontend
+            
+            # Даём права вашему пользователю
+            sudo chown -R $USER:$USER /var/www/sandkittens-frontend
+            
+            # Очищаем старые файлы
+            rm -rf /var/www/sandkittens-frontend/*
+      
       - name: Deploy React via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -40,6 +57,8 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: './*'
           target: '/var/www/sandkittens-frontend'
+          strip_components: 0
+          overwrite: true
       
       - name: Deploy Backend and Restart Services
         uses: appleboy/ssh-action@v1.0.3
@@ -77,4 +96,3 @@ jobs:
             echo "Frontend: https://sandkittens.me"
             echo "API: https://sandkittens.me/api/"
             echo "Mongo Admin: https://sandkittens.me/mongo-admin/"
-            

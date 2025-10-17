@@ -41,7 +41,7 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
         {
           label: 'Sandbox',
           icon: FlaskConical,
-          path: '/sandbox?workflow_id=68dedd8771c9a1c02dbb903d',
+          path: '/sandbox?workflow_id=68dee410d2da09b7b691b749',
           active: currentPath === '/sandbox'
         },
         {
@@ -53,7 +53,7 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
         {
           label: 'Preview',
           icon: PlayCircle,
-          path: '/preview?workflow_id=68dedd8771c9a1c02dbb903d',
+          path: '/preview?workflow_id=68dee410d2da09b7b691b749',
           active: currentPath === '/preview'
         }
       ]

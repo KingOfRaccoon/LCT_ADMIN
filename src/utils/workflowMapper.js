@@ -15,6 +15,21 @@ import '../types/workflowContract.js';
 function detectStateType(node) {
   const nodeType = node.type?.toLowerCase();
   const nodeData = node.data || {};
+  const stateType = node.state_type?.toLowerCase();
+
+  // Прямая проверка state_type или type
+  if (stateType === 'integration' || nodeType === 'integration') {
+    return 'integration';
+  }
+  if (stateType === 'technical' || nodeType === 'technical') {
+    return 'technical';
+  }
+  if (stateType === 'screen' || nodeType === 'screen') {
+    return 'screen';
+  }
+  if (stateType === 'service' || nodeType === 'service') {
+    return 'service';
+  }
 
   // Если есть actionType в data - это action узел
   if (nodeData.actionType) {
@@ -46,12 +61,12 @@ function detectStateType(node) {
   }
 
   // Screen узлы (явно указан тип или есть screenId)
-  if (nodeType === 'screen' || nodeData.screenId) {
+  if (nodeData.screenId) {
     return 'screen';
   }
 
   // Service узлы (init, cleanup и т.д.)
-  if (nodeType === 'service' || nodeData.isServiceNode) {
+  if (nodeData.isServiceNode) {
     return 'service';
   }
 
@@ -109,10 +124,22 @@ function createTechnicalExpressions(nodeData) {
 
 /**
  * Создает expressions для integration состояния
+ * @param {Object} node - Узел (может быть BDUI node или готовый state)
  * @param {Object} nodeData - Данные узла
  * @returns {IntegrationExpression[]}
  */
-function createIntegrationExpressions(nodeData) {
+function createIntegrationExpressions(node, nodeData) {
+  // Если expressions уже есть на верхнем уровне узла - используем их
+  if (Array.isArray(node.expressions) && node.expressions.length > 0) {
+    return node.expressions;
+  }
+
+  // Если expressions в nodeData - используем их
+  if (Array.isArray(nodeData.expressions) && nodeData.expressions.length > 0) {
+    return nodeData.expressions;
+  }
+
+  // Иначе создаём из config
   const expressions = [];
   const config = nodeData.config || {};
 
@@ -270,49 +297,75 @@ function createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData = {}
 function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName, screens = {}) {
   const stateType = detectStateType(node);
   const nodeData = node.data || {};
-  const outgoingEdges = allEdges.filter(e => e.source === node.id);
+  
+  // Используем edges из node.edges (если есть) или ищем в allEdges
+  const outgoingEdges = Array.isArray(node.edges) && node.edges.length > 0
+    ? node.edges
+    : allEdges.filter(e => e.source === node.id);
 
   // Создаем expressions в зависимости от типа
   let expressions = [];
   if (stateType === 'technical') {
     expressions = createTechnicalExpressions(nodeData);
   } else if (stateType === 'integration') {
-    expressions = createIntegrationExpressions(nodeData);
+    expressions = createIntegrationExpressions(node, nodeData);
   } else if (stateType === 'screen') {
     expressions = createScreenExpressions(nodeData, outgoingEdges);
   }
 
-  // Создаем transitions (передаем nodeData для извлечения variable)
-  const transitions = createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData);
-
-  // Получаем screen данные для screen узлов
-  let screenData = {};
-  if (stateType === 'screen' && nodeData.screenId && screens[nodeData.screenId]) {
-    screenData = screens[nodeData.screenId];
-    console.log(`📄 [mapNodeToState] Including screen data for "${nodeData.label || node.id}" (screenId: ${nodeData.screenId})`, {
-      screenKeys: Object.keys(screenData),
-      hasSection: !!screenData.sections,
-      screenId: screenData.id
+  // Создаем transitions
+  // Если transitions уже есть на верхнем уровне узла - используем их
+  let transitions = [];
+  
+  if (Array.isArray(node.transitions) && node.transitions.length > 0) {
+    // Маппим state_id через nodeIdToName и сохраняем порядок полей
+    transitions = node.transitions.map(t => {
+      const mappedStateId = nodeIdToName.get(t.state_id) || t.state_id;
+      
+      // Сохраняем порядок полей: variable (если есть), case, state_id
+      const transition = {};
+      if (t.variable != null) {  // Проверяем на null и undefined
+        transition.variable = t.variable;
+      }
+      if (t.case !== undefined) {  // case может быть null, это нормально
+        transition.case = t.case;
+      }
+      transition.state_id = mappedStateId;
+      
+      return transition;
     });
-  } else if (stateType === 'screen') {
-    console.warn(`⚠️ [mapNodeToState] Screen state without screen data: "${nodeData.label || node.id}"`, {
-      stateType,
-      hasScreenId: !!nodeData.screenId,
-      screenId: nodeData.screenId,
-      screenExists: nodeData.screenId ? !!screens[nodeData.screenId] : false,
-      availableScreens: Object.keys(screens)
-    });
+  } else {
+    // Иначе создаём из рёбер
+    transitions = createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData);
   }
 
+  // Базовый объект состояния
   const state = {
     state_type: stateType,
-    name: nodeData.label || node.id,
-    screen: screenData,
-    initial_state: initialNodes.has(node.id),
-    final_state: finalNodes.has(node.id),
+    name: node.label || nodeData.label || node.id,
+    initial_state: node.start === true || initialNodes.has(node.id),
+    final_state: node.final === true || finalNodes.has(node.id),
     expressions: expressions,
     transitions: transitions
   };
+
+  // Добавляем screen данные ТОЛЬКО для screen состояний
+  if (stateType === 'screen') {
+    if (nodeData.screenId && screens[nodeData.screenId]) {
+      state.screen = screens[nodeData.screenId];
+    } else {
+      state.screen = {};
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ [workflowMapper] Screen state without screen data: "${nodeData.label || node.id}"`, {
+          stateType,
+          hasScreenId: !!nodeData.screenId,
+          screenId: nodeData.screenId,
+          screenExists: nodeData.screenId ? !!screens[nodeData.screenId] : false,
+          availableScreens: Object.keys(screens)
+        });
+      }
+    }
+  }
 
   return state;
 }
@@ -327,18 +380,34 @@ function findInitialAndFinalNodes(nodes, edges) {
   const hasIncoming = new Set();
   const hasOutgoing = new Set();
 
+  // Анализируем edges (React Flow формат)
   edges.forEach(edge => {
     hasIncoming.add(edge.target);
     hasOutgoing.add(edge.source);
   });
 
-  console.log('🔍 [findInitialAndFinalNodes] Analyzing graph structure:', {
-    totalNodes: nodes.length,
-    totalEdges: edges.length,
-    nodesWithIncoming: hasIncoming.size,
-    nodesWithOutgoing: hasOutgoing.size,
-    nodesWithoutIncoming: nodes.filter(n => !hasIncoming.has(n.id)).map(n => n.id),
-    nodesWithoutOutgoing: nodes.filter(n => !hasOutgoing.has(n.id)).map(n => n.id)
+  // Также анализируем transitions на верхнем уровне узлов
+  nodes.forEach(node => {
+    if (Array.isArray(node.transitions) && node.transitions.length > 0) {
+      // У узла есть transitions - значит есть исходящие связи
+      hasOutgoing.add(node.id);
+      // Добавляем целевые состояния как имеющие входящие
+      node.transitions.forEach(t => {
+        if (t.state_id) {
+          hasIncoming.add(t.state_id);
+        }
+      });
+    }
+    
+    // Также проверяем node.edges (могут быть на уровне узла)
+    if (Array.isArray(node.edges) && node.edges.length > 0) {
+      hasOutgoing.add(node.id);
+      node.edges.forEach(edge => {
+        if (edge.target) {
+          hasIncoming.add(edge.target);
+        }
+      });
+    }
   });
 
   // Начальные узлы - те, у которых нет входящих рёбер
@@ -355,16 +424,10 @@ function findInitialAndFinalNodes(nodes, edges) {
       .map(node => node.id)
   );
 
-  console.log('🔍 [findInitialAndFinalNodes] Before fallback logic:', {
-    initialNodes: Array.from(initialNodes),
-    finalNodes: Array.from(finalNodes)
-  });
-
   // Если нет явно помеченных начальных - берем первый без входящих
   if (initialNodes.size === 0 && nodes.length > 0) {
     const firstNode = nodes.find(n => !hasIncoming.has(n.id)) || nodes[0];
     initialNodes.add(firstNode.id);
-    console.log('⚠️ [findInitialAndFinalNodes] No initial nodes found, using fallback:', firstNode.id);
   }
 
   // Если нет конечных - добавляем узлы без исходящих
@@ -374,13 +437,7 @@ function findInitialAndFinalNodes(nodes, edges) {
         finalNodes.add(node.id);
       }
     });
-    console.log('⚠️ [findInitialAndFinalNodes] No final nodes found, using fallback:', Array.from(finalNodes));
   }
-
-  console.log('✅ [findInitialAndFinalNodes] Final result:', {
-    initialNodes: Array.from(initialNodes),
-    finalNodes: Array.from(finalNodes)
-  });
 
   return { initialNodes, finalNodes };
 }
@@ -394,15 +451,6 @@ function findInitialAndFinalNodes(nodes, edges) {
 export function mapGraphDataToWorkflow(graphData, initialContext = {}) {
   const { nodes = [], edges = [], screens = {} } = graphData;
 
-  console.log('🗺️ [workflowMapper] Starting graph to workflow conversion:', {
-    nodesCount: nodes.length,
-    edgesCount: edges.length,
-    screensCount: Object.keys(screens).length,
-    screenIds: Object.keys(screens),
-    nodeIds: nodes.map(n => n.id),
-    nodeLabels: nodes.map(n => n.data?.label || n.id)
-  });
-
   if (nodes.length === 0) {
     throw new Error('Graph must contain at least one node');
   }
@@ -414,54 +462,23 @@ export function mapGraphDataToWorkflow(graphData, initialContext = {}) {
     nodeIdToName.set(node.id, stateName);
   });
 
-  console.log('🗺️ [workflowMapper] NodeId -> StateName mapping:', 
-    Array.from(nodeIdToName.entries()).map(([id, name]) => `${id} -> "${name}"`)
-  );
-
   // Находим начальные и конечные узлы
   const { initialNodes, finalNodes } = findInitialAndFinalNodes(nodes, edges);
-
-  console.log('🗺️ [workflowMapper] Initial and final nodes:', {
-    initialCount: initialNodes.size,
-    finalCount: finalNodes.size,
-    initial: Array.from(initialNodes).map(id => {
-      const name = nodeIdToName.get(id);
-      return `${id} ("${name}")`;
-    }),
-    final: Array.from(finalNodes).map(id => {
-      const name = nodeIdToName.get(id);
-      return `${id} ("${name}")`;
-    })
-  });
 
   // Преобразуем каждый узел в StateModel
   const states = nodes.map(node => 
     mapNodeToState(node, edges, initialNodes, finalNodes, nodeIdToName, screens)
   );
 
-  console.log('🗺️ [workflowMapper] Mapped states:', {
-    count: states.length,
-    stateNames: states.map(s => s.name),
-    stateTypes: states.map(s => `${s.name}: ${s.state_type}`),
-    initialStates: states.filter(s => s.initial_state).map(s => s.name),
-    finalStates: states.filter(s => s.final_state).map(s => s.name),
-    transitions: states.map(s => ({
-      from: s.name,
-      to: s.transitions.map(t => t.state_id)
-    }))
-  });
-
   // Валидация маппинга
   const mappedStateNames = new Set(states.map(s => s.name));
   states.forEach(state => {
     state.transitions.forEach(t => {
       if (!mappedStateNames.has(t.state_id)) {
-        console.error(`❌ [workflowMapper] Invalid transition: "${state.name}" -> "${t.state_id}" (target не существует)`);
+        console.error(`[workflowMapper] Invalid transition: "${state.name}" -> "${t.state_id}" (target state does not exist)`);
       }
     });
   });
-
-  console.log('✅ [workflowMapper] Mapping completed successfully');
 
   return {
     states,

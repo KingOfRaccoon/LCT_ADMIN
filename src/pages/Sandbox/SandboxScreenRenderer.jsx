@@ -556,7 +556,8 @@ const SandboxScreenRenderer = ({
           return [];
         };
 
-        const rawItems = resolveBinding(props?.items, []);
+        // Support both 'items' (legacy) and 'dataSource' (new format)
+        const rawItems = resolveBinding(props?.dataSource ?? props?.items, []);
         const itemsArray = normalizeItems(rawItems);
         const variant = resolveProp(props, 'variant', 'unordered');
         const displayPath = resolveProp(props, 'displayPath', undefined);

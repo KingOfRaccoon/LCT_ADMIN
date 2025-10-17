@@ -66,7 +66,10 @@ export function convertAvitoDemoNodesToReactFlow(avitoDemoNodes) {
 
   return avitoDemoNodes.map((node, index) => {
     const isStart = node.start === true;
-    const isFinal = !node.edges || node.edges.length === 0;
+    // Узел финальный, если у него нет ни edges, ни transitions
+    const hasEdges = node.edges && node.edges.length > 0;
+    const hasTransitions = node.transitions && node.transitions.length > 0;
+    const isFinal = !hasEdges && !hasTransitions;
     const isTechnical = node.type === 'technical' || node.state_type === 'technical';
 
     // Базовая структура узла
@@ -113,6 +116,10 @@ export function convertAvitoDemoNodesToReactFlow(avitoDemoNodes) {
       reactFlowNode.data.expressions = node.expressions?.map(normalizeIntegrationExpression) || [];
       reactFlowNode.data.transitions = node.transitions || [];
       reactFlowNode.data.stateMetadata = node.metadata;
+      
+      // Добавляем transitions на верхний уровень для маппера
+      reactFlowNode.transitions = node.transitions || [];
+      reactFlowNode.expressions = node.expressions || [];
     }
 
     return reactFlowNode;

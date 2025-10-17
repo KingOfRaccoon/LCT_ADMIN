@@ -2394,7 +2394,7 @@ const ScreenBuilder = () => {
         currentScreen
       });
 
-      navigate('/sandbox?workflow_id=68dedd8771c9a1c02dbb903d', {
+      navigate('/sandbox?workflow_id=68dee410d2da09b7b691b749', {
         state: {
           product: productPayload,
           variableSchemas

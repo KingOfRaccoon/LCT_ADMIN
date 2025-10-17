@@ -1,33 +1,23 @@
 {
   "id": "avito-cart-demo",
   "name": "Авито — Корзина",
-  "description": "Демонстрационный сценарий корзины Avito: добавление товаров, изменение количества, upsell-блоки и переход к оформлению.",
+  "description": "Профессиональный сценарий корзины с загрузкой товаров из API",
   "slug": "avito-cart",
   "variableSchemas": {
-    "cart": {
+    "cart_response": {
       "type": "object",
       "schema": {
-        "items": "array",
-        "selectedCount": "number",
-        "totalPrice": "number",
-        "totalDiscount": "number"
+        "id": "number",
+        "user_id": "number",
+        "advertisements": "array"
       }
     },
-    "stores": {
-      "type": "array",
+    "store": {
+      "type": "object",
       "schema": {
-        "id": "string",
+        "id": "number",
         "name": "string",
         "rating": "number"
-      }
-    },
-    "recommendations": {
-      "type": "array",
-      "schema": {
-        "id": "string",
-        "title": "string",
-        "price": "number",
-        "image": "string"
       }
     },
     "ui": {
@@ -46,118 +36,18 @@
     }
   },
   "initialContext": {
-    "cart": {
-      "items": [
-        {
-          "id": "item-1",
-          "storeId": "store-pear",
-          "storeName": "Pear Store",
-          "title": "Зарядное устройство MagSafe Charger USB Type-C",
-          "price": 4990,
-          "originalPrice": 6990,
-          "quantity": 1,
-          "image": "https://via.placeholder.com/80x80/2563eb/ffffff?text=MS",
-          "isSelected": true,
-          "deliveryAvailable": true,
-          "liked": false
-        },
-        {
-          "id": "item-2",
-          "storeId": "store-pear",
-          "storeName": "Pear Store",
-          "title": "Беспроводные наушники AirPods Pro 2",
-          "price": 15990,
-          "originalPrice": 18490,
-          "quantity": 1,
-          "image": "https://via.placeholder.com/80x80/2563eb/ffffff?text=AP",
-          "isSelected": true,
-          "deliveryAvailable": true,
-          "liked": false
-        },
-        {
-          "id": "item-3",
-          "storeId": "store-techno",
-          "storeName": "TECHNO ZONE",
-          "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-          "price": 99990,
-          "originalPrice": 0,
-          "quantity": 1,
-          "image": "https://via.placeholder.com/80x80/10b981/ffffff?text=i15",
-          "isSelected": true,
-          "deliveryAvailable": false,
-          "liked": false
-        }
-      ],
-      "pearStoreItems": [
-        {
-          "id": "item-1",
-          "storeId": "store-pear",
-          "storeName": "Pear Store",
-          "title": "Зарядное устройство MagSafe Charger USB Type-C",
-          "price": 4990,
-          "originalPrice": 6990,
-          "quantity": 1,
-          "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-          "isSelected": true,
-          "deliveryAvailable": true,
-          "liked": false
-        },
-        {
-          "id": "item-2",
-          "storeId": "store-pear",
-          "storeName": "Pear Store",
-          "title": "Беспроводные наушники AirPods Pro 2",
-          "price": 15990,
-          "originalPrice": 18490,
-          "quantity": 1,
-          "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-          "isSelected": true,
-          "deliveryAvailable": true,
-          "liked": false
-        }
-      ],
-      "technoStoreItems": [
-        {
-          "id": "item-3",
-          "storeId": "store-techno",
-          "storeName": "TECHNO ZONE",
-          "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-          "price": 99990,
-          "originalPrice": 0,
-          "quantity": 1,
-          "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-          "isSelected": true,
-          "deliveryAvailable": false,
-          "liked": false
-        }
-      ],
-      "selectedCount": 3,
-      "totalPrice": 120970,
-      "totalDiscount": 8490
+    "cart_response": {
+      "id": 3,
+      "user_id": 14,
+      "advertisements": []
     },
-    "stores": [
-      {
-        "id": "store-pear",
-        "name": "Pear Store",
-        "rating": 4.8
-      },
-      {
-        "id": "store-techno",
-        "name": "TECHNO ZONE",
-        "rating": 5.0
-      }
-    ],
-    "recommendations": [
-      {
-        "id": "rec-1",
-        "storeId": "store-pear",
-        "title": "Добавьте ещё 1 товар до скидки 5%",
-        "subtitle": "Чехол Premium для iPhone, Blue Titanium",
-        "price": 26551,
-        "discount": 22,
-        "image": "https://via.placeholder.com/120x120/6366f1/ffffff?text=Case"
-      }
-    ],
+    "store": {
+      "id": 14,
+      "name": "Екатерина Батюшкова",
+      "rating": 5.0
+    },
+    "selected_advertisement_id": 8,
+    "add_to_cart_response": null,
     "ui": {
       "ready": false,
       "notifications": {
@@ -168,568 +58,99 @@
       }
     },
     "state": {
-      "empty": false,
-      "loading": true
+      "empty": true,
+      "loading": false
     }
   },
   "nodes": [
     {
-      "id": "fetch-cute-images",
-      "label": "Загрузка милых картинок",
+      "id": "fetch-cart-items",
+      "label": "Загрузка товаров корзины",
       "type": "integration",
       "state_type": "integration",
       "start": true,
-      "description": "Загружает данные с Nekos Best API для демонстрации Integration States",
+      "description": "Загружает корзину с товарами пользователя",
       "expressions": [
         {
-          "variable": "cute_images",
-          "url": "https://nekos.best/api/v2/hug?amount=4",
+          "variable": "cart_response",
+          "url": "https://sandkittens.me/backservices/api/carts/3/with-advertisements",
           "params": {},
           "method": "get",
           "metadata": {
-            "description": "Получает 4 случайные картинки обнимашек с Nekos Best API",
+            "description": "Получает корзину с ID 3 и все товары в ней",
             "category": "data",
-            "tags": ["integration", "api", "demo"]
+            "tags": ["integration", "api", "cart", "advertisements"]
           }
         }
       ],
       "transitions": [
         {
-          "variable": "cute_images",
+          "variable": "cart_response",
           "case": null,
-          "state_id": "show-cute-images"
+          "state_id": "cart-main"
         }
       ],
       "edges": []
     },
     {
-      "id": "show-cute-images",
-      "label": "Экран с милыми картинками",
-      "type": "screen",
-      "screenId": "screen-cute-images",
-      "start": false,
-      "edges": [
-        {
-          "id": "edge-images-to-loading",
-          "label": "К корзине",
-          "event": "loadComplete",
-          "keepInputs": true,
-          "summary": "Переход к экрану загрузки корзины",
-          "target": "loading",
-          "contextPatch": {}
-        }
-      ]
-    },
-    {
-      "id": "loading",
-      "label": "Загрузка корзины",
-      "type": "screen",
-      "screenId": "screen-loading",
-      "start": false,
-      "edges": [
-        {
-          "id": "edge-load-complete",
-          "label": "Данные загружены",
-          "event": "loadComplete",
-          "keepInputs": false,
-          "summary": "Переход к экрану корзины после загрузки",
-          "target": "cart-main",
-          "contextPatch": {
-            "ui.ready": true,
-            "state.loading": false,
-            "cart.pearStoreItems": [
-              {
-                "id": "item-1",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Зарядное устройство MagSafe Charger USB Type-C",
-                "price": 4990,
-                "originalPrice": 6990,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-2",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Беспроводные наушники AirPods Pro 2",
-                "price": 15990,
-                "originalPrice": 18490,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.technoStoreItems": [
-              {
-                "id": "item-3",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-                "price": 99990,
-                "originalPrice": 0,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-                "isSelected": true,
-                "deliveryAvailable": false,
-                "liked": false
-              }
-            ],
-            "cart.totalPrice": 120970,
-            "cart.selectedCount": 3
-          }
-        }
-      ]
-    },
-    {
       "id": "cart-main",
-      "label": "Корзина (основной экран)",
+      "label": "Корзина",
       "type": "screen",
       "screenId": "screen-cart-main",
+      "start": false,
       "edges": [
         {
-          "id": "edge-increment-item",
-          "label": "Увеличить количество",
-          "event": "incrementItem",
+          "id": "edge-add-to-cart",
+          "label": "Добавить товар",
+          "event": "addToCart",
           "keepInputs": true,
-          "summary": "Увеличивает количество выбранного товара и пересчитывает итоги",
-          "target": "action-increment",
-          "contextPatch": {}
-        },
-        {
-          "id": "edge-decrement-item",
-          "label": "Уменьшить количество",
-          "event": "decrementItem",
-          "keepInputs": true,
-          "summary": "Уменьшает количество выбранного товара",
-          "target": "action-decrement",
-          "contextPatch": {}
-        },
-        {
-          "id": "edge-remove-item",
-          "label": "Удалить товар",
-          "event": "removeItem",
-          "keepInputs": true,
-          "summary": "Удаляет товар из корзины и показывает уведомление undo",
-          "target": "action-remove",
-          "contextPatch": {}
-        },
-        {
-          "id": "edge-add-recommended",
-          "label": "Добавить рекомендацию",
-          "event": "addRecommended",
-          "keepInputs": true,
-          "summary": "Добавляет товар из блока upsell в корзину",
-          "target": "action-add-recommended",
+          "summary": "Добавление товара в корзину",
+          "target": "add-to-cart-integration",
           "contextPatch": {}
         },
         {
           "id": "edge-checkout",
-          "label": "Оформить доставку",
+          "label": "Оформить заказ",
           "event": "checkout",
           "keepInputs": true,
           "summary": "Переход к оформлению заказа",
           "target": "checkout-screen",
-          "contextPatch": {
-            "state.checkingOut": true
-          }
-        },
-        {
-          "id": "edge-select-all",
-          "label": "Выбрать всё",
-          "event": "selectAll",
-          "keepInputs": true,
-          "summary": "Помечает все товары как выбранные",
-          "target": "action-select-all",
-          "contextPatch": {}
-        },
-        {
-          "id": "edge-clear-all",
-          "label": "Удалить всё",
-          "event": "clearAll",
-          "keepInputs": true,
-          "summary": "Очищает корзину и переходит к пустому состоянию",
-          "target": "cart-empty",
-          "contextPatch": {
-            "cart.items": [],
-            "cart.selectedCount": 0,
-            "cart.totalPrice": 0,
-            "cart.totalDiscount": 0,
-            "state.empty": true
-          }
-        }
-      ]
-    },
-    {
-      "id": "action-increment",
-      "label": "Увеличение количества",
-      "type": "action",
-      "data": {
-        "actionType": "modify-cart-item",
-        "operation": "increment",
-        "description": "Увеличивает quantity товара на 1 и пересчитывает totalPrice и selectedCount",
-        "config": {
-          "itemIdParam": "itemId",
-          "minQuantity": 1,
-          "maxQuantity": 99,
-          "arrays": ["cart.pearStoreItems", "cart.technoStoreItems"],
-          "recalculate": ["cart.totalPrice", "cart.selectedCount"]
-        }
-      },
-      "edges": [
-        {
-          "id": "edge-back-to-cart-increment",
-          "label": "Обновлено",
-          "target": "cart-main",
           "contextPatch": {}
         }
       ]
     },
     {
-      "id": "action-decrement",
-      "label": "Уменьшение количества",
-      "type": "action",
-      "data": {
-        "actionType": "modify-cart-item",
-        "operation": "decrement",
-        "description": "Уменьшает quantity товара на 1 (минимум 1) и пересчитывает totalPrice и selectedCount",
-        "config": {
-          "itemIdParam": "itemId",
-          "minQuantity": 1,
-          "maxQuantity": 99,
-          "arrays": ["cart.pearStoreItems", "cart.technoStoreItems"],
-          "recalculate": ["cart.totalPrice", "cart.selectedCount"]
-        }
-      },
-      "edges": [
+      "id": "add-to-cart-integration",
+      "label": "Добавление товара в корзину",
+      "type": "integration",
+      "state_type": "integration",
+      "start": false,
+      "description": "POST-запрос для добавления товара в корзину",
+      "expressions": [
         {
-          "id": "edge-back-to-cart-decrement",
-          "label": "Обновлено",
-          "target": "cart-main",
-          "contextPatch": {}
-        }
-      ]
-    },
-    {
-      "id": "action-remove",
-      "label": "Удаление товара",
-      "type": "action",
-      "data": {
-        "actionType": "context-update",
-        "description": "Удаляет товар из корзины"
-      },
-      "edges": [
-        {
-          "id": "edge-back-to-cart-remove",
-          "label": "Товар удалён",
-          "target": "cart-main",
-          "contextPatch": {
-            "cart.selectedCount": 2,
-            "cart.totalPrice": 94420,
-            "ui.notifications.type": "undo",
-            "ui.notifications.message": "Товар удалён из корзины",
-            "ui.notifications.actionLabel": "Вернуть",
-            "ui.notifications.actionEvent": "undoRemove"
+          "variable": "add_to_cart_response",
+          "url": "https://sandkittens.me/backservices/api/carts/add-advertisement",
+          "params": {},
+          "method": "post",
+          "body": {
+            "cart_id": 3,
+            "advertisement_id": 10
+          },
+          "metadata": {
+            "description": "Добавляет товар в корзину пользователя",
+            "category": "data",
+            "tags": ["integration", "api", "cart", "post"]
           }
         }
-      ]
-    },
-    {
-      "id": "action-add-recommended",
-      "label": "Добавление рекомендованного товара",
-      "type": "action",
-      "data": {
-        "actionType": "context-update",
-        "description": "Добавляет товар из upsell-блока в случайный магазин"
-      },
-      "edges": [
+      ],
+      "transitions": [
         {
-          "id": "edge-back-to-cart-add-rec-pear",
-          "label": "Добавлен в Pear Store",
-          "target": "cart-main",
-          "contextPatch": {
-            "cart.items": [
-              {
-                "id": "item-1",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Зарядное устройство MagSafe Charger USB Type-C",
-                "price": 4990,
-                "originalPrice": 6990,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-2",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Беспроводные наушники AirPods Pro 2",
-                "price": 15990,
-                "originalPrice": 18490,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-3",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-                "price": 99990,
-                "originalPrice": 0,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-                "isSelected": true,
-                "deliveryAvailable": false,
-                "liked": false
-              },
-              {
-                "id": "item-4",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Чехол Premium для iPhone, Blue Titanium",
-                "price": 26551,
-                "originalPrice": 34040,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MT223?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1693000975756",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.pearStoreItems": [
-              {
-                "id": "item-1",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Зарядное устройство MagSafe Charger USB Type-C",
-                "price": 4990,
-                "originalPrice": 6990,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-2",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Беспроводные наушники AirPods Pro 2",
-                "price": 15990,
-                "originalPrice": 18490,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-4",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Чехол Premium для iPhone, Blue Titanium",
-                "price": 26551,
-                "originalPrice": 34040,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MT223?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1693000975756",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.technoStoreItems": [
-              {
-                "id": "item-3",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-                "price": 99990,
-                "originalPrice": 0,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-                "isSelected": true,
-                "deliveryAvailable": false,
-                "liked": false
-              }
-            ],
-            "cart.selectedCount": 4,
-            "cart.totalPrice": 147521,
-            "ui.notifications.type": "success",
-            "ui.notifications.message": "Чехол добавлен в Pear Store"
-          }
-        },
-        {
-          "id": "edge-back-to-cart-add-rec-techno",
-          "label": "Добавлен в TECHNO ZONE",
-          "target": "cart-main",
-          "contextPatch": {
-            "cart.items": [
-              {
-                "id": "item-1",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Зарядное устройство MagSafe Charger USB Type-C",
-                "price": 4990,
-                "originalPrice": 6990,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-2",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Беспроводные наушники AirPods Pro 2",
-                "price": 15990,
-                "originalPrice": 18490,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-3",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-                "price": 99990,
-                "originalPrice": 0,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-                "isSelected": true,
-                "deliveryAvailable": false,
-                "liked": false
-              },
-              {
-                "id": "item-5",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Беспроводная клавиатура Magic Keyboard",
-                "price": 12990,
-                "originalPrice": 15290,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MK2A3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1628010471000",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.pearStoreItems": [
-              {
-                "id": "item-1",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Зарядное устройство MagSafe Charger USB Type-C",
-                "price": 4990,
-                "originalPrice": 6990,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MHXH3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1661301830394",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              },
-              {
-                "id": "item-2",
-                "storeId": "store-pear",
-                "storeName": "Pear Store",
-                "title": "Беспроводные наушники AirPods Pro 2",
-                "price": 15990,
-                "originalPrice": 18490,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MQD83?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1660803972361",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.technoStoreItems": [
-              {
-                "id": "item-3",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Смартфон iPhone 15 Pro, 256 ГБ",
-                "price": 99990,
-                "originalPrice": 0,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch-naturaltitanium?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1692845699311",
-                "isSelected": true,
-                "deliveryAvailable": false,
-                "liked": false
-              },
-              {
-                "id": "item-5",
-                "storeId": "store-techno",
-                "storeName": "TECHNO ZONE",
-                "title": "Беспроводная клавиатура Magic Keyboard",
-                "price": 12990,
-                "originalPrice": 15290,
-                "quantity": 1,
-                "image": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MK2A3?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1628010471000",
-                "isSelected": true,
-                "deliveryAvailable": true,
-                "liked": false
-              }
-            ],
-            "cart.selectedCount": 4,
-            "cart.totalPrice": 133960,
-            "ui.notifications.type": "success",
-            "ui.notifications.message": "Клавиатура добавлена в TECHNO ZONE"
-          }
+          "variable": "add_to_cart_response",
+          "case": null,
+          "state_id": "fetch-cart-items"
         }
-      ]
-    },
-    {
-      "id": "action-select-all",
-      "label": "Выбрать все товары",
-      "type": "action",
-      "data": {
-        "actionType": "context-update",
-        "description": "Помечает все товары как выбранные"
-      },
-      "edges": [
-        {
-          "id": "edge-back-to-cart-select-all",
-          "label": "Все выбраны",
-          "target": "cart-main",
-          "contextPatch": {
-            "cart.selectedCount": 3
-          }
-        }
-      ]
-    },
-    {
-      "id": "cart-empty",
-      "label": "Корзина пуста",
-      "type": "screen",
-      "screenId": "screen-cart-empty",
-      "edges": [
-        {
-          "id": "edge-empty-help",
-          "label": "Как это работает?",
-          "event": "help",
-          "keepInputs": true,
-          "summary": "Открывает справку о работе корзины",
-          "target": "cart-empty",
-          "contextPatch": {
-            "ui.notifications.type": "info",
-            "ui.notifications.message": "Справка открыта"
-          }
-        }
-      ]
+      ],
+      "edges": []
     },
     {
       "id": "checkout-screen",
@@ -740,217 +161,6 @@
     }
   ],
   "screens": {
-    "screen-cute-images": {
-      "id": "screen-cute-images",
-      "type": "Screen",
-      "name": "Милые картинки из API",
-      "style": {
-        "display": "flex",
-        "flexDirection": "column",
-        "minHeight": "720px",
-        "backgroundColor": "#ffffff",
-        "borderRadius": "12px",
-        "padding": "24px"
-      },
-      "sections": {
-        "body": {
-          "id": "section-cute-images-body",
-          "type": "Section",
-          "properties": {
-            "slot": "body",
-            "padding": 16,
-            "spacing": 16
-          },
-          "children": [
-            {
-              "id": "text-cute-images-title",
-              "type": "text",
-              "properties": {
-                "content": "🌸 Милые картинки загружены с API!",
-                "variant": "heading"
-              },
-              "style": {
-                "fontSize": "24px",
-                "fontWeight": 600,
-                "color": "#2F3034",
-                "textAlign": "center",
-                "marginBottom": "16px"
-              }
-            },
-            {
-              "id": "text-cute-images-description",
-              "type": "text",
-              "properties": {
-                "content": "Данные получены через Integration State с nekos.best API",
-                "variant": "body"
-              },
-              "style": {
-                "fontSize": "14px",
-                "color": "#6b7280",
-                "textAlign": "center",
-                "marginBottom": "24px"
-              }
-            },
-            {
-              "id": "list-cute-images",
-              "type": "list",
-              "properties": {
-                "dataSource": "{{cute_images.results}}",
-                "iterationAlias": "image"
-              },
-              "style": {
-                "display": "grid",
-                "gridTemplateColumns": "repeat(2, 1fr)",
-                "gap": "16px"
-              },
-              "itemTemplate": {
-                "id": "card-image-{{itemIndex}}",
-                "type": "container",
-                "style": {
-                  "backgroundColor": "#f9fafb",
-                  "borderRadius": "12px",
-                  "overflow": "hidden",
-                  "boxShadow": "0 1px 3px rgba(0,0,0,0.1)"
-                },
-                "children": [
-                  {
-                    "id": "image-{{itemIndex}}",
-                    "type": "image",
-                    "properties": {
-                      "src": "{{image.url}}",
-                      "alt": "Cute anime image"
-                    },
-                    "style": {
-                      "width": "100%",
-                      "height": "200px",
-                      "objectFit": "cover"
-                    }
-                  },
-                  {
-                    "id": "text-artist-{{itemIndex}}",
-                    "type": "text",
-                    "properties": {
-                      "content": "Artist: {{image.artist_name}}",
-                      "variant": "caption"
-                    },
-                    "style": {
-                      "padding": "12px",
-                      "fontSize": "12px",
-                      "color": "#6b7280"
-                    }
-                  },
-                  {
-                    "id": "text-source-{{itemIndex}}",
-                    "type": "text",
-                    "properties": {
-                      "content": "Source: {{image.source_url}}",
-                      "variant": "caption"
-                    },
-                    "style": {
-                      "padding": "0 12px 12px 12px",
-                      "fontSize": "11px",
-                      "color": "#9ca3af",
-                      "wordBreak": "break-all"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "id": "button-continue-to-cart",
-              "type": "button",
-              "properties": {
-                "label": "Продолжить к корзине →",
-                "variant": "primary"
-              },
-              "style": {
-                "marginTop": "24px",
-                "paddingVertical": 16,
-                "paddingHorizontal": 32,
-                "backgroundColor": "#0A74F0",
-                "borderRadius": "12px",
-                "fontSize": "16px",
-                "fontWeight": 600,
-                "color": "#ffffff",
-                "cursor": "pointer"
-              },
-              "events": {
-                "onClick": "loadComplete"
-              }
-            }
-          ]
-        }
-      }
-    },
-    "screen-loading": {
-      "id": "screen-loading",
-      "type": "Screen",
-      "name": "Загрузка",
-      "style": {
-        "display": "flex",
-        "flexDirection": "column",
-        "minHeight": "720px",
-        "backgroundColor": "#ffffff",
-        "borderRadius": "12px",
-        "padding": "0px"
-      },
-      "sections": {
-        "body": {
-          "id": "section-loading-body",
-          "type": "Section",
-          "properties": {
-            "slot": "body",
-            "padding": 48,
-            "spacing": 24,
-            "alignItems": "center",
-            "justifyContent": "center"
-          },
-          "style": {
-            "flex": "1 1 auto",
-            "display": "flex",
-            "alignItems": "center",
-            "justifyContent": "center"
-          },
-          "children": [
-            {
-              "id": "text-loading-title",
-              "type": "text",
-              "properties": {
-                "content": "Загружаем вашу корзину…",
-                "variant": "heading"
-              },
-              "style": {
-                "fontSize": "24px",
-                "fontWeight": 600,
-                "color": "#2F3034",
-                "textAlign": "center"
-              }
-            },
-            {
-              "id": "button-loading-continue",
-              "type": "button",
-              "properties": {
-                "label": "Продолжить",
-                "variant": "primary"
-              },
-              "style": {
-                "marginTop": "24px",
-                "paddingVertical": 16,
-                "paddingHorizontal": 32,
-                "backgroundColor": "#0A74F0",
-                "borderRadius": "12px",
-                "fontSize": "16px",
-                "fontWeight": 600,
-                "color": "#ffffff"
-              },
-              "events": {
-                "onClick": "loadComplete"
-              }
-            }
-          ]
-        }
-      }
-    },
     "screen-cart-main": {
       "id": "screen-cart-main",
       "type": "Screen",
@@ -959,7 +169,7 @@
         "display": "flex",
         "flexDirection": "column",
         "minHeight": "720px",
-        "backgroundColor": "#F5F5F5",
+        "backgroundColor": "#ffffff",
         "borderRadius": "12px",
         "padding": "0px"
       },
@@ -969,142 +179,49 @@
           "type": "Section",
           "properties": {
             "slot": "header",
-            "padding": 0,
-            "spacing": 0,
-            "flexDirection": "column"
+            "padding": 16,
+            "spacing": 12,
+            "background": "#ffffff"
           },
           "style": {
-            "width": "100%",
-            "background": "#ffffff",
-            "display": "flex",
-            "flexDirection": "column"
+            "borderBottom": "1px solid #E5E5E5"
           },
           "children": [
             {
-              "id": "row-header-top",
-              "type": "row",
+              "id": "text-cart-title",
+              "type": "text",
               "properties": {
-                "spacing": 0,
-                "alignItems": "center",
-                "justifyContent": "space-between",
-                "padding": 16
+                "content": "Корзина",
+                "variant": "heading"
               },
               "style": {
-                "width": "100%",
-                "flexShrink": 0,
-                "paddingBottom": "16px"
-              },
-              "children": [
-                {
-                  "id": "button-back",
-                  "type": "button",
-                  "properties": {
-                    "text": "←",
-                    "variant": "secondary",
-                    "event": "back"
-                  },
-                  "style": {
-                    "width": "40px",
-                    "height": "40px",
-                    "border": "none",
-                    "background": "transparent",
-                    "fontSize": "24px",
-                    "color": "#000000",
-                    "padding": "0"
-                  }
-                },
-                {
-                  "id": "text-cart-title",
-                  "type": "text",
-                  "properties": {
-                    "content": "Корзина",
-                    "variant": "heading"
-                  },
-                  "style": {
-                    "fontSize": "17px",
-                    "fontWeight": 600,
-                    "color": "#000000",
-                    "flex": "1",
-                    "textAlign": "center"
-                  }
-                },
-                {
-                  "id": "spacer",
-                  "type": "text",
-                  "properties": {
-                    "content": ""
-                  },
-                  "style": {
-                    "width": "40px"
-                  }
-                }
-              ]
+                "fontSize": "24px",
+                "fontWeight": 700,
+                "color": "#2F3034"
+              }
             },
             {
-              "id": "row-header-controls",
+              "id": "row-cart-actions",
               "type": "row",
               "properties": {
-                "spacing": 8,
+                "spacing": 12,
                 "alignItems": "center",
-                "justifyContent": "space-between",
-                "padding": 16
-              },
-              "style": {
-                "width": "100%",
-                "flexShrink": 0,
-                "borderTop": "1px solid #E5E5E5",
-                "paddingTop": "16px"
+                "justifyContent": "space-between"
               },
               "children": [
                 {
-                  "id": "row-select-all",
-                  "type": "row",
+                  "id": "text-store-name",
+                  "type": "text",
                   "properties": {
-                    "spacing": 8,
-                    "alignItems": "center"
-                  },
-                  "children": [
-                    {
-                      "id": "checkbox-select-all",
-                      "type": "checkbox",
-                      "properties": {
-                        "checked": true,
-                        "event": "selectAll"
-                      },
-                      "style": {
-                        "width": "20px",
-                        "height": "20px"
-                      }
+                    "content": {
+                      "reference": "${store.name}",
+                      "value": "Магазин"
                     },
-                    {
-                      "id": "text-select-all",
-                      "type": "text",
-                      "properties": {
-                        "content": "Выбрать всё",
-                        "variant": "body"
-                      },
-                      "style": {
-                        "fontSize": "15px",
-                        "color": "#000000",
-                        "fontWeight": 400
-                      }
-                    }
-                  ]
-                },
-                {
-                  "id": "button-clear-all",
-                  "type": "button",
-                  "properties": {
-                    "text": "Удалить (3)",
-                    "variant": "link",
-                    "event": "clearAll"
+                    "variant": "body"
                   },
                   "style": {
                     "fontSize": "15px",
-                    "color": "#007AFF",
-                    "background": "transparent",
-                    "border": "none",
-                    "padding": "0",
+                    "color": "#000000",
                     "fontWeight": 400
                   }
                 }
@@ -1127,813 +244,89 @@
           },
           "children": [
             {
-              "id": "column-store-pear",
-              "type": "column",
+              "id": "list-cart-items",
+              "type": "list",
               "properties": {
-                "spacing": 12,
-                "padding": 16,
-                "background": "#ffffff"
+                "dataSource": {
+                  "reference": "${cart_response.advertisements}",
+                  "value": []
+                },
+                "itemAlias": "product"
               },
               "style": {
-                "borderRadius": "8px",
-                "boxShadow": "0 4px 12px rgba(15, 23, 42, 0.08)"
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "12px"
               },
               "children": [
                 {
-                  "id": "row-store-header-pear",
-                  "type": "row",
-                  "properties": {
-                    "spacing": 8,
-                    "alignItems": "center"
-                  },
-                  "children": [
-                    {
-                      "id": "checkbox-store-pear",
-                      "type": "checkbox",
-                      "properties": {
-                        "checked": true,
-                        "event": "toggleStorePear"
-                      },
-                      "style": {
-                        "width": "20px",
-                        "height": "20px"
-                      }
-                    },
-                    {
-                      "id": "text-store-name-pear",
-                      "type": "text",
-                      "properties": {
-                        "content": "Pear Store",
-                        "variant": "subtitle"
-                      },
-                      "style": {
-                        "fontSize": "17px",
-                        "fontWeight": 600,
-                        "color": "#000000"
-                      }
-                    },
-                    {
-                      "id": "text-store-rating-pear",
-                      "type": "text",
-                      "properties": {
-                        "content": "⭐ 4,8 (643)",
-                        "variant": "caption"
-                      },
-                      "style": {
-                        "fontSize": "13px",
-                        "color": "#8E8E93",
-                        "marginLeft": "4px"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "id": "list-cart-items-pear",
-                  "type": "list",
-                  "properties": {
-                    "variant": "unordered",
-                    "spacing": 12,
-                    "items": {
-                      "reference": "${cart.pearStoreItems}",
-                      "value": []
-                    },
-                    "itemAlias": "cartItem"
-                  },
-                  "style": {
-                    "listStyleType": "none",
-                    "padding": 0,
-                    "margin": 0,
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "gap": "12px"
-                  },
-                  "children": [
-                    {
-                      "id": "row-cart-item-pear",
-                      "type": "row",
-                      "properties": {
-                        "spacing": 12,
-                        "alignItems": "flex-start",
-                        "padding": 12,
-                        "background": "#ffffff"
-                      },
-                      "style": {
-                        "borderRadius": "0px"
-                      },
-                      "children": [
-                        {
-                          "id": "checkbox-item-pear",
-                          "type": "checkbox",
-                          "properties": {
-                            "checked": true,
-                            "event": "toggleItemPear"
-                          },
-                          "style": {
-                            "width": "20px",
-                            "height": "20px",
-                            "marginTop": "30px"
-                          }
-                        },
-                        {
-                          "id": "image-item-pear",
-                          "type": "image",
-                          "properties": {
-                            "src": {
-                              "reference": "${cartItem.image}",
-                              "value": "https://via.placeholder.com/80x80"
-                            },
-                            "alt": {
-                              "reference": "${cartItem.title}",
-                              "value": "Товар"
-                            },
-                            "width": 80,
-                            "height": 80
-                          },
-                          "style": {
-                            "borderRadius": "12px",
-                            "objectFit": "cover"
-                          }
-                        },
-                        {
-                          "id": "column-item-details-pear",
-                          "type": "column",
-                          "properties": {
-                            "spacing": 8,
-                            "flex": 1
-                          },
-                          "children": [
-                            {
-                              "id": "row-item-price-pear",
-                              "type": "row",
-                              "properties": {
-                                "spacing": 8,
-                                "alignItems": "baseline",
-                                "justifyContent": "space-between"
-                              },
-                              "children": [
-                                {
-                                  "id": "text-item-price-pear",
-                                  "type": "text",
-                                  "properties": {
-                                    "content": {
-                                      "reference": "${cartItem.price}",
-                                      "value": "4 990 ₽"
-                                    },
-                                    "variant": "heading"
-                                  },
-                                  "style": {
-                                    "fontSize": "17px",
-                                    "fontWeight": 600,
-                                    "color": "#000000"
-                                  }
-                                },
-                                {
-                                  "id": "button-favorite-pear",
-                                  "type": "button",
-                                  "properties": {
-                                    "text": "♡",
-                                    "variant": "icon",
-                                    "event": "toggleFavorite"
-                                  },
-                                  "style": {
-                                    "fontSize": "20px",
-                                    "color": "#8E8E93",
-                                    "background": "transparent",
-                                    "border": "none",
-                                    "padding": "0"
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "id": "text-item-title-pear",
-                              "type": "text",
-                              "properties": {
-                                "content": {
-                                  "reference": "${cartItem.title}",
-                                  "value": "Зарядка MagSafe Charger 15W 1 метр"
-                                },
-                                "variant": "body"
-                              },
-                              "style": {
-                                "fontSize": "13px",
-                                "fontWeight": 400,
-                                "color": "#000000",
-                                "lineHeight": "18px"
-                              }
-                            },
-                            {
-                              "id": "row-item-actions-pear",
-                              "type": "row",
-                              "properties": {
-                                "spacing": 12,
-                                "alignItems": "center",
-                                "justifyContent": "space-between"
-                              },
-                              "children": [
-                                {
-                                  "id": "row-quantity-controls-pear",
-                                  "type": "row",
-                                  "properties": {
-                                    "spacing": 12,
-                                    "alignItems": "center"
-                                  },
-                                  "children": [
-                                    {
-                                      "id": "button-decrement-pear",
-                                      "type": "button",
-                                      "properties": {
-                                        "text": "−",
-                                        "variant": "secondary",
-                                        "event": "decrementItem",
-                                        "eventParams": {
-                                          "itemId": {
-                                            "reference": "${cartItem.id}",
-                                            "value": "item-1"
-                                          }
-                                        }
-                                      },
-                                      "style": {
-                                        "width": "28px",
-                                        "height": "28px",
-                                        "borderRadius": "50%",
-                                        "background": "#F2F2F7",
-                                        "color": "#000000",
-                                        "fontSize": "18px",
-                                        "border": "none",
-                                        "display": "flex",
-                                        "alignItems": "center",
-                                        "justifyContent": "center"
-                                      }
-                                    },
-                                    {
-                                      "id": "text-item-quantity-pear",
-                                      "type": "text",
-                                      "properties": {
-                                        "content": {
-                                          "reference": "${cartItem.quantity}",
-                                          "value": "1"
-                                        },
-                                        "variant": "body"
-                                      },
-                                      "style": {
-                                        "fontSize": "17px",
-                                        "fontWeight": 400,
-                                        "color": "#000000",
-                                        "minWidth": "20px",
-                                        "textAlign": "center"
-                                      }
-                                    },
-                                    {
-                                      "id": "button-increment-pear",
-                                      "type": "button",
-                                      "properties": {
-                                        "text": "+",
-                                        "variant": "secondary",
-                                        "event": "incrementItem",
-                                        "eventParams": {
-                                          "itemId": {
-                                            "reference": "${cartItem.id}",
-                                            "value": "item-1"
-                                          }
-                                        }
-                                      },
-                                      "style": {
-                                        "width": "28px",
-                                        "height": "28px",
-                                        "borderRadius": "50%",
-                                        "background": "#F2F2F7",
-                                        "color": "#000000",
-                                        "fontSize": "18px",
-                                        "border": "none",
-                                        "display": "flex",
-                                        "alignItems": "center",
-                                        "justifyContent": "center"
-                                      }
-                                    }
-                                  ]
-                                },
-                                {
-                                  "id": "button-delete-pear",
-                                  "type": "button",
-                                  "properties": {
-                                    "text": "🗑",
-                                    "variant": "icon",
-                                    "event": "removeItem"
-                                  },
-                                  "style": {
-                                    "fontSize": "18px",
-                                    "color": "#8E8E93",
-                                    "background": "transparent",
-                                    "border": "none",
-                                    "padding": "0"
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "id": "text-delivery-pear",
-                              "type": "text",
-                              "properties": {
-                                "content": "Купить с доставкой",
-                                "variant": "caption"
-                              },
-                              "style": {
-                                "fontSize": "13px",
-                                "color": "#A933FF",
-                                "fontWeight": 400
-                              }
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "column-store-techno",
-              "type": "column",
-              "properties": {
-                "spacing": 12,
-                "padding": 16,
-                "background": "#ffffff"
-              },
-              "style": {
-                "borderRadius": "8px",
-                "boxShadow": "0 4px 12px rgba(15, 23, 42, 0.08)"
-              },
-              "children": [
-                {
-                  "id": "row-store-header-techno",
-                  "type": "row",
-                  "properties": {
-                    "spacing": 8,
-                    "alignItems": "center"
-                  },
-                  "children": [
-                    {
-                      "id": "checkbox-store-techno",
-                      "type": "checkbox",
-                      "properties": {
-                        "checked": true,
-                        "event": "toggleStoreTechno"
-                      },
-                      "style": {
-                        "width": "20px",
-                        "height": "20px"
-                      }
-                    },
-                    {
-                      "id": "text-store-name-techno",
-                      "type": "text",
-                      "properties": {
-                        "content": "TECHNO ZONE",
-                        "variant": "subtitle"
-                      },
-                      "style": {
-                        "fontSize": "17px",
-                        "fontWeight": 600,
-                        "color": "#000000"
-                      }
-                    },
-                    {
-                      "id": "text-store-rating-techno",
-                      "type": "text",
-                      "properties": {
-                        "content": "⭐ 5,0 (916)",
-                        "variant": "caption"
-                      },
-                      "style": {
-                        "fontSize": "13px",
-                        "color": "#8E8E93",
-                        "marginLeft": "4px"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "id": "list-cart-items-techno",
-                  "type": "list",
-                  "properties": {
-                    "variant": "unordered",
-                    "spacing": 12,
-                    "items": {
-                      "reference": "${cart.technoStoreItems}",
-                      "value": []
-                    },
-                    "itemAlias": "cartItem"
-                  },
-                  "style": {
-                    "listStyleType": "none",
-                    "padding": 0,
-                    "margin": 0,
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "gap": "12px"
-                  },
-                  "children": [
-                    {
-                      "id": "row-cart-item-techno",
-                      "type": "row",
-                      "properties": {
-                        "spacing": 12,
-                        "alignItems": "flex-start",
-                        "padding": 12,
-                        "background": "#ffffff"
-                      },
-                      "style": {
-                        "borderRadius": "0px"
-                      },
-                      "children": [
-                        {
-                          "id": "checkbox-item-techno",
-                          "type": "checkbox",
-                          "properties": {
-                            "checked": true,
-                            "event": "toggleItemTechno"
-                          },
-                          "style": {
-                            "width": "20px",
-                            "height": "20px",
-                            "marginTop": "30px"
-                          }
-                        },
-                        {
-                          "id": "image-item-techno",
-                          "type": "image",
-                          "properties": {
-                            "src": {
-                              "reference": "${cartItem.image}",
-                              "value": "https://via.placeholder.com/80x80"
-                            },
-                            "alt": {
-                              "reference": "${cartItem.title}",
-                              "value": "Товар"
-                            },
-                            "width": 80,
-                            "height": 80
-                          },
-                          "style": {
-                            "borderRadius": "12px",
-                            "objectFit": "cover"
-                          }
-                        },
-                        {
-                          "id": "column-item-details-techno",
-                          "type": "column",
-                          "properties": {
-                            "spacing": 8,
-                            "flex": 1
-                          },
-                          "children": [
-                            {
-                              "id": "row-item-price-techno",
-                              "type": "row",
-                              "properties": {
-                                "spacing": 8,
-                                "alignItems": "baseline",
-                                "justifyContent": "space-between"
-                              },
-                              "children": [
-                                {
-                                  "id": "text-item-price-techno",
-                                  "type": "text",
-                                  "properties": {
-                                    "content": {
-                                      "reference": "${cartItem.price}",
-                                      "value": "99 990 ₽"
-                                    },
-                                    "variant": "heading"
-                                  },
-                                  "style": {
-                                    "fontSize": "17px",
-                                    "fontWeight": 600,
-                                    "color": "#000000"
-                                  }
-                                },
-                                {
-                                  "id": "button-favorite-techno",
-                                  "type": "button",
-                                  "properties": {
-                                    "text": "♡",
-                                    "variant": "icon",
-                                    "event": "toggleFavorite"
-                                  },
-                                  "style": {
-                                    "fontSize": "20px",
-                                    "color": "#8E8E93",
-                                    "background": "transparent",
-                                    "border": "none",
-                                    "padding": "0"
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "id": "text-item-title-techno",
-                              "type": "text",
-                              "properties": {
-                                "content": {
-                                  "reference": "${cartItem.title}",
-                                  "value": "iPhone 16 Pro, 256 ГБ"
-                                },
-                                "variant": "body"
-                              },
-                              "style": {
-                                "fontSize": "13px",
-                                "fontWeight": 400,
-                                "color": "#000000",
-                                "lineHeight": "18px"
-                              }
-                            },
-                            {
-                              "id": "row-item-actions-techno",
-                              "type": "row",
-                              "properties": {
-                                "spacing": 12,
-                                "alignItems": "center",
-                                "justifyContent": "space-between"
-                              },
-                              "children": [
-                                {
-                                  "id": "row-quantity-controls-techno",
-                                  "type": "row",
-                                  "properties": {
-                                    "spacing": 12,
-                                    "alignItems": "center"
-                                  },
-                                  "children": [
-                                    {
-                                      "id": "button-decrement-techno",
-                                      "type": "button",
-                                      "properties": {
-                                        "text": "−",
-                                        "variant": "secondary",
-                                        "event": "decrementItem",
-                                        "eventParams": {
-                                          "itemId": {
-                                            "reference": "${cartItem.id}",
-                                            "value": "item-3"
-                                          }
-                                        }
-                                      },
-                                      "style": {
-                                        "width": "28px",
-                                        "height": "28px",
-                                        "borderRadius": "50%",
-                                        "background": "#F2F2F7",
-                                        "color": "#000000",
-                                        "fontSize": "18px",
-                                        "border": "none",
-                                        "display": "flex",
-                                        "alignItems": "center",
-                                        "justifyContent": "center"
-                                      }
-                                    },
-                                    {
-                                      "id": "text-item-quantity-techno",
-                                      "type": "text",
-                                      "properties": {
-                                        "content": {
-                                          "reference": "${cartItem.quantity}",
-                                          "value": "1"
-                                        },
-                                        "variant": "body"
-                                      },
-                                      "style": {
-                                        "fontSize": "17px",
-                                        "fontWeight": 400,
-                                        "color": "#000000",
-                                        "minWidth": "20px",
-                                        "textAlign": "center"
-                                      }
-                                    },
-                                    {
-                                      "id": "button-increment-techno",
-                                      "type": "button",
-                                      "properties": {
-                                        "text": "+",
-                                        "variant": "secondary",
-                                        "event": "incrementItem",
-                                        "eventParams": {
-                                          "itemId": {
-                                            "reference": "${cartItem.id}",
-                                            "value": "item-3"
-                                          }
-                                        }
-                                      },
-                                      "style": {
-                                        "width": "28px",
-                                        "height": "28px",
-                                        "borderRadius": "50%",
-                                        "background": "#F2F2F7",
-                                        "color": "#000000",
-                                        "fontSize": "18px",
-                                        "border": "none",
-                                        "display": "flex",
-                                        "alignItems": "center",
-                                        "justifyContent": "center"
-                                      }
-                                    }
-                                  ]
-                                },
-                                {
-                                  "id": "button-delete-techno",
-                                  "type": "button",
-                                  "properties": {
-                                    "text": "🗑",
-                                    "variant": "icon",
-                                    "event": "removeItem"
-                                  },
-                                  "style": {
-                                    "fontSize": "18px",
-                                    "color": "#8E8E93",
-                                    "background": "transparent",
-                                    "border": "none",
-                                    "padding": "0"
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "id": "text-delivery-techno",
-                              "type": "text",
-                              "properties": {
-                                "content": "Купить с доставкой",
-                                "variant": "caption"
-                              },
-                              "style": {
-                                "fontSize": "13px",
-                                "color": "#A933FF",
-                                "fontWeight": 400
-                              }
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "column-recommendations",
-              "type": "column",
-              "properties": {
-                "spacing": 12,
-                "padding": 0,
-                "background": "transparent"
-              },
-              "style": {
-                "borderRadius": "0px"
-              },
-              "children": [
-                {
-                  "id": "row-rec-header",
-                  "type": "row",
-                  "properties": {
-                    "spacing": 8,
-                    "alignItems": "center",
-                    "justifyContent": "space-between",
-                    "padding": 16
-                  },
-                  "children": [
-                    {
-                      "id": "text-rec-title",
-                      "type": "text",
-                      "properties": {
-                        "content": "↻  Добавьте ещё 1 товар до скидки 5%",
-                        "variant": "subtitle"
-                      },
-                      "style": {
-                        "fontSize": "15px",
-                        "fontWeight": 400,
-                        "color": "#000000"
-                      }
-                    },
-                    {
-                      "id": "text-arrow",
-                      "type": "text",
-                      "properties": {
-                        "content": "→",
-                        "variant": "icon"
-                      },
-                      "style": {
-                        "fontSize": "18px",
-                        "color": "#8E8E93"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "id": "row-rec-carousel",
+                  "id": "row-cart-item-{{itemIndex}}",
                   "type": "row",
                   "properties": {
                     "spacing": 12,
-                    "padding": 16,
-                    "overflowX": "scroll"
+                    "alignItems": "flex-start",
+                    "padding": 12,
+                    "background": "#ffffff"
                   },
                   "style": {
-                    "display": "flex",
-                    "gap": "12px"
+                    "borderRadius": "12px",
+                    "border": "1px solid #E5E5E5"
                   },
                   "children": [
                     {
-                      "id": "card-rec-item",
+                      "id": "column-item-details-{{itemIndex}}",
                       "type": "column",
                       "properties": {
                         "spacing": 8,
-                        "padding": 12,
-                        "background": "#ffffff"
-                      },
-                      "style": {
-                        "borderRadius": "12px",
-                        "minWidth": "140px",
-                        "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.08)"
+                        "flex": 1
                       },
                       "children": [
                         {
-                          "id": "image-rec",
-                          "type": "image",
+                          "id": "text-item-title-{{itemIndex}}",
+                          "type": "text",
                           "properties": {
-                            "src": "https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/MT223?wid=200&hei=200&fmt=jpeg&qlt=95&.v=1693000975756",
-                            "alt": "Apple Watch",
-                            "width": 120,
-                            "height": 120
+                            "content": {
+                              "reference": "${product.name}",
+                              "value": "Название товара"
+                            },
+                            "variant": "body"
                           },
                           "style": {
-                            "borderRadius": "8px",
-                            "objectFit": "cover"
+                            "fontSize": "15px",
+                            "fontWeight": 600,
+                            "color": "#000000"
                           }
                         },
                         {
-                          "id": "row-rec-price",
-                          "type": "row",
-                          "properties": {
-                            "spacing": 4,
-                            "alignItems": "baseline"
-                          },
-                          "children": [
-                            {
-                              "id": "text-rec-price",
-                              "type": "text",
-                              "properties": {
-                                "content": "26 591 ₽",
-                                "variant": "body"
-                              },
-                              "style": {
-                                "fontSize": "15px",
-                                "fontWeight": 600,
-                                "color": "#000000"
-                              }
-                            },
-                            {
-                              "id": "text-rec-old-price",
-                              "type": "text",
-                              "properties": {
-                                "content": "27 990 ₽",
-                                "variant": "caption"
-                              },
-                              "style": {
-                                "fontSize": "13px",
-                                "color": "#8E8E93",
-                                "textDecoration": "line-through"
-                              }
-                            }
-                          ]
-                        },
-                        {
-                          "id": "text-rec-name",
+                          "id": "text-item-description-{{itemIndex}}",
                           "type": "text",
                           "properties": {
-                            "content": "Apple Watch 10 42mm Blue",
+                            "content": {
+                              "reference": "${product.description}",
+                              "value": "Описание товара"
+                            },
+                            "variant": "caption"
+                          },
+                          "style": {
+                            "fontSize": "13px",
+                            "fontWeight": 400,
+                            "color": "#8E8E93"
+                          }
+                        },
+                        {
+                          "id": "text-item-owner-{{itemIndex}}",
+                          "type": "text",
+                          "properties": {
+                            "content": {
+                              "reference": "${product.owner_name}",
+                              "value": "Продавец"
+                            },
                             "variant": "caption"
                           },
                           "style": {
                             "fontSize": "12px",
-                            "color": "#000000",
-                            "lineHeight": "16px"
-                          }
-                        },
-                        {
-                          "id": "button-add-rec",
-                          "type": "button",
-                          "properties": {
-                            "text": "В корзину",
-                            "variant": "primary",
-                            "event": "addRecommended"
-                          },
-                          "style": {
-                            "fontSize": "13px",
-                            "fontWeight": 500,
-                            "padding": "8px 12px",
-                            "borderRadius": "8px",
-                            "background": "#007AFF",
-                            "color": "#ffffff",
-                            "border": "none",
-                            "width": "100%"
+                            "fontWeight": 400,
+                            "color": "#8E8E93"
                           }
                         }
                       ]
@@ -1941,6 +334,29 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "button-add-to-cart",
+              "type": "button",
+              "properties": {
+                "text": "Добавить товар в корзину",
+                "variant": "secondary",
+                "event": "addToCart",
+                "eventParams": {
+                  "advertisement_id": 8
+                }
+              },
+              "style": {
+                "marginTop": "16px",
+                "padding": "12px 24px",
+                "borderRadius": "12px",
+                "backgroundColor": "#F0F0F0",
+                "fontSize": "15px",
+                "fontWeight": 600,
+                "color": "#0A74F0",
+                "border": "1px solid #E5E5E5",
+                "cursor": "pointer"
+              }
             }
           ]
         },
@@ -1955,159 +371,25 @@
           },
           "style": {
             "borderTop": "1px solid #E5E5E5",
-            "boxShadow": "0 -2px 8px rgba(0, 0, 0, 0.08)",
-            "position": "fixed",
-            "bottom": 0,
-            "width": "100%",
-            "zIndex": 100
+            "boxShadow": "0 -2px 8px rgba(0, 0, 0, 0.08)"
           },
           "children": [
             {
-              "id": "row-footer-content",
-              "type": "row",
-              "properties": {
-                "spacing": 16,
-                "alignItems": "center",
-                "justifyContent": "space-between"
-              },
-              "style": {
-                "width": "100%"
-              },
-              "children": [
-                {
-                  "id": "column-total",
-                  "type": "column",
-                  "properties": {
-                    "spacing": 2,
-                    "alignItems": "flex-start"
-                  },
-                  "children": [
-                    {
-                      "id": "text-item-count",
-                      "type": "text",
-                      "properties": {
-                        "content": "3 товара",
-                        "variant": "caption"
-                      },
-                      "style": {
-                        "fontSize": "13px",
-                        "fontWeight": 400,
-                        "color": "#8E8E93"
-                      }
-                    },
-                    {
-                      "id": "text-total-price",
-                      "type": "text",
-                      "properties": {
-                        "content": "120 979 ₽",
-                        "variant": "heading"
-                      },
-                      "style": {
-                        "fontSize": "24px",
-                        "fontWeight": 700,
-                        "color": "#000000",
-                        "lineHeight": "1.2"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "id": "button-checkout",
-                  "type": "button",
-                  "properties": {
-                    "text": "Оформить доставку",
-                    "variant": "primary",
-                    "event": "checkout"
-                  },
-                  "style": {
-                    "height": "48px",
-                    "paddingLeft": "24px",
-                    "paddingRight": "24px",
-                    "borderRadius": "8px",
-                    "background": "#A933FF",
-                    "color": "#ffffff",
-                    "fontSize": "16px",
-                    "fontWeight": 600,
-                    "border": "none",
-                    "boxShadow": "none"
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      }
-    },
-    "screen-cart-empty": {
-      "id": "screen-cart-empty",
-      "type": "Screen",
-      "name": "Корзина пуста",
-      "style": {
-        "display": "flex",
-        "flexDirection": "column",
-        "minHeight": "720px",
-        "backgroundColor": "#ffffff",
-        "borderRadius": "12px",
-        "padding": "0px"
-      },
-      "sections": {
-        "body": {
-          "id": "section-empty-body",
-          "type": "Section",
-          "properties": {
-            "slot": "body",
-            "padding": 48,
-            "spacing": 20,
-            "alignItems": "center",
-            "justifyContent": "center"
-          },
-          "style": {
-            "flex": "1 1 auto",
-            "display": "flex",
-            "alignItems": "center",
-            "justifyContent": "center",
-            "textAlign": "center"
-          },
-          "children": [
-            {
-              "id": "text-empty-title",
-              "type": "text",
-              "properties": {
-                "content": "В корзине пусто",
-                "variant": "heading"
-              },
-              "style": {
-                "fontSize": "28px",
-                "fontWeight": 700,
-                "color": "#2F3034"
-              }
-            },
-            {
-              "id": "text-empty-description",
-              "type": "text",
-              "properties": {
-                "content": "Добавьте товары из каталога, чтобы увидеть их здесь и купить с доставкой.",
-                "variant": "body"
-              },
-              "style": {
-                "fontSize": "16px",
-                "lineHeight": "24px",
-                "color": "#8E8E93"
-              }
-            },
-            {
-              "id": "button-empty-help",
+              "id": "button-checkout",
               "type": "button",
               "properties": {
-                "text": "Как это работает?",
-                "variant": "secondary",
-                "size": "medium",
-                "event": "help"
+                "text": "Перейти к оформлению",
+                "variant": "primary",
+                "event": "checkout"
               },
               "style": {
-                "marginTop": "16px",
-                "padding": "12px 24px",
-                "borderRadius": "12px"
+                "width": "100%",
+                "padding": "16px",
+                "borderRadius": "12px",
+                "backgroundColor": "#0A74F0",
+                "fontSize": "16px",
+                "fontWeight": 600,
+                "color": "#ffffff"
               }
             }
           ]
@@ -2157,7 +439,7 @@
               "id": "text-checkout-placeholder",
               "type": "text",
               "properties": {
-                "content": "Форма оформления появится здесь: адрес доставки, контакты, способ оплаты.",
+                "content": "Форма оформления появится здесь",
                 "variant": "body"
               },
               "style": {

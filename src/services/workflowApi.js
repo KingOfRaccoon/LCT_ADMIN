@@ -214,7 +214,8 @@ export class WorkflowAPI {
       normalized.transitions = [
         {
           state_id: normalized.transitions[0].state_id,
-          case: null  // Принудительно null
+          case: null,  // Принудительно null
+          variable: normalized.transitions[0].variable
         }
       ];
     }

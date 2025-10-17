@@ -690,7 +690,7 @@ const SandboxPage = () => {
     setCurrentNodeId(nodeId);
   }, []);
 
-  const handleNodeEvent = useCallback((eventName) => {
+  const handleNodeEvent = useCallback((eventName, eventParams = {}) => {
     if (!eventName || !currentNode) {
       console.log('[SandboxPage] handleNodeEvent: missing eventName or currentNode', { eventName, currentNode: currentNode?.id });
       return;
@@ -705,8 +705,20 @@ const SandboxPage = () => {
     console.log('[SandboxPage] handleNodeEvent:', {
       eventName: normalized,
       nodeId: currentNode.id,
+      eventParams,
       availableEdges: currentNode.edges?.map(e => ({ id: e.id, event: e.event, target: e.target }))
     });
+
+    // Сохраняем eventParams в контекст перед переходом
+    if (eventParams && Object.keys(eventParams).length > 0) {
+      setContextState((prevContext) => {
+        const updatedContext = { ...prevContext };
+        Object.entries(eventParams).forEach(([key, value]) => {
+          updatedContext[key] = value;
+        });
+        return updatedContext;
+      });
+    }
 
     const edge = (currentNode.edges ?? []).find((candidate) => candidate && candidate.event === normalized);
     if (!edge) {

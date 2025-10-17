@@ -23,3 +23,36 @@ dist-ssr
 *.sln
 *.sw?
 .github/*
+
+# Backup files
+*.backup
+*_old.*
+*.bak
+
+# Large documentation files (keep in docs but don't track changes)
+RENDER_ENGINE_COMPATIBILITY_AUDIT.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+build/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

@@ -6,6 +6,20 @@ import {
 } from './utils/bindings';
 import { resolveWidgetStyles } from '../../styles/resolveWidgetStyles';
 import { useAnalyticsOptional } from '../../services/analytics';
+import { useRenderPerformance } from './hooks/useRenderPerformance';
+// ✅ ФАЗА 2: Импорт мемоизированных компонентов
+import {
+  ButtonComponent,
+  TextComponent,
+  ImageComponent,
+  InputComponent,
+  ColumnComponent,
+  RowComponent,
+  ContainerComponent
+} from './components/ScreenComponents';
+import { useBindingCache } from './hooks/useBindingCache';
+// ✅ ФАЗА 3: Импорт виртуализированного списка
+import { SmartList, useVirtualization } from './components/VirtualizedList';
 import '../ScreenBuilder/ScreenBuilder.css';
 
 const spacingToCss = (value) => {
@@ -55,14 +69,65 @@ const SandboxScreenRenderer = ({
   const components = useMemo(() => (screen?.components ?? []), [screen?.components]);
   const activeScreenId = screen?.id ?? screen?.screenId ?? null;
   const activeScreenName = screen?.name ?? screen?.title ?? (activeScreenId ? String(activeScreenId) : null);
+  
+  // ✅ ФАЗА 2.2: Кэширование биндингов для ускорения рендеринга
+  const { resolveCached, logStats } = useBindingCache(context);
+  
+  // 📊 Performance tracking
+  useRenderPerformance(
+    'SandboxScreenRenderer',
+    activeScreenId,
+    components.length,
+    true // включено для сбора baseline метрик
+  );
 
+  // ✅ ФАЗА 1.3: Оптимизированное создание componentsMap
   const componentsMap = useMemo(() => {
-    const map = new Map();
-    components.forEach((component) => {
-      if (component && component.id) map.set(component.id, component);
-    });
-    return map;
+    if (!components || components.length === 0) {
+      return new Map();
+    }
+    
+    // Более эффективная реализация с filter и map
+    return new Map(
+      components
+        .filter(c => c?.id) // Фильтруем компоненты без ID
+        .map(c => [c.id, c])
+    );
   }, [components]);
+  
+  // ✅ ФАЗА 1.2: Кэширование базовых стилей компонентов
+  const baseStyles = useMemo(() => ({
+    screen: {
+      width: '100%',
+      minHeight: '640px',
+      borderRadius: '32px',
+      overflow: 'hidden',
+      background: '#ffffff',
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    column: {
+      display: 'flex',
+      flexDirection: 'column',
+      width: '100%'
+    },
+    section: {
+      display: 'flex',
+      width: '100%'
+    },
+    container: {
+      display: 'flex',
+      flexDirection: 'column',
+      borderRadius: '16px',
+      border: '1px solid rgba(148, 163, 184, 0.12)',
+      boxShadow: '0 16px 32px rgba(15, 23, 42, 0.12)'
+    },
+    row: {
+      display: 'flex',
+      flexDirection: 'row',
+      width: '100%'
+    }
+  }), []);
 
   // rootComponent for old format (components array)
   const rootComponent = useMemo(
@@ -117,8 +182,11 @@ const SandboxScreenRenderer = ({
         return null;
       }
 
+      // ✅ ФАЗА 1.1: Улучшенные keys - используем стабильный ID вместо индекса
+      const stableKey = child.id || `${component.id || 'parent'}-child-${idx}`;
+
       return (
-        <div key={child.id ?? idx} className="sandbox-component-wrapper">
+        <div key={stableKey} className="sandbox-component-wrapper">
           {renderComponent(child, iterationStack)}
         </div>
       );
@@ -223,15 +291,10 @@ const SandboxScreenRenderer = ({
     switch (component.type) {
       case 'screen': {
         const paddingValue = paddingToCss(props?.padding);
+        // ✅ ФАЗА 1.2: Используем кэшированный baseStyle
         const style = mergeStyles(
           {
-            width: '100%',
-            minHeight: '640px',
-            borderRadius: '32px',
-            overflow: 'hidden',
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
+            ...baseStyles.screen,
             gap: spacingToCss(props?.spacing ?? 0),
             padding: paddingValue
           },
@@ -246,20 +309,16 @@ const SandboxScreenRenderer = ({
       }
 
       case 'column': {
-        const paddingValue = paddingToCss(props?.padding);
-        const baseStyle = {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: spacingToCss(props?.spacing ?? 16),
-          width: '100%',
-          padding: paddingValue
-        };
-        const style = mergeStyles(baseStyle, component.style);
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный ColumnComponent
         return (
-          <div className="sandbox-column" style={style}>
+          <ColumnComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            baseStyles={baseStyles}
+          >
             {renderChildren(component, iterationStack)}
-          </div>
+          </ColumnComponent>
         );
       }
 
@@ -268,17 +327,20 @@ const SandboxScreenRenderer = ({
         const paddingValue = paddingToCss(props?.padding);
         const spacingValue = spacingToCss(props?.spacing ?? 0);
         const flexDirection = props?.flexDirection ?? 'column';
-        const baseStyle = {
-          display: 'flex',
-          flexDirection,
-          gap: spacingValue,
-          alignItems: props?.alignItems,
-          justifyContent: props?.justifyContent,
-          padding: paddingValue,
-          background: props?.background ?? component.style?.background ?? 'transparent',
-          width: props?.width ?? component.style?.width ?? '100%'
-        };
-        const style = mergeStyles(baseStyle, component.style);
+        // ✅ ФАЗА 1.2: Используем кэшированный baseStyle
+        const style = mergeStyles(
+          {
+            ...baseStyles.section,
+            flexDirection,
+            gap: spacingValue,
+            alignItems: props?.alignItems,
+            justifyContent: props?.justifyContent,
+            padding: paddingValue,
+            background: props?.background ?? component.style?.background ?? 'transparent',
+            width: props?.width ?? component.style?.width ?? '100%'
+          },
+          component.style
+        );
 
         return (
           <div
@@ -292,105 +354,46 @@ const SandboxScreenRenderer = ({
       }
 
       case 'container': {
-        const paddingValue = paddingToCss(props?.padding ?? 0);
-        const style = mergeStyles(
-          {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: spacingToCss(props?.spacing ?? 16),
-            padding: paddingValue,
-            background: props?.background || 'transparent',
-            borderRadius: props?.borderRadius || component.style?.borderRadius || '16px',
-            border: props?.border || component.style?.border || '1px solid rgba(148, 163, 184, 0.12)',
-            boxShadow: component.style?.boxShadow || '0 16px 32px rgba(15, 23, 42, 0.12)'
-          },
-          component.style
-        );
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный ContainerComponent
         return (
-          <div className="sandbox-container" style={style}>
+          <ContainerComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            baseStyles={baseStyles}
+          >
             {renderChildren(component, iterationStack)}
-          </div>
+          </ContainerComponent>
         );
       }
 
       case 'row': {
-        const paddingValue = paddingToCss(props?.padding);
-        const baseStyle = {
-          display: 'flex',
-          flexDirection: 'row',
-          gap: spacingToCss(props?.spacing ?? 16),
-          padding: paddingValue,
-          width: '100%',
-          alignItems: props?.alignItems,
-          justifyContent: props?.justifyContent
-        };
-        const style = mergeStyles(baseStyle, component.style);
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный RowComponent
         return (
-          <div className="sandbox-row" style={style}>
+          <RowComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            baseStyles={baseStyles}
+          >
             {renderChildren(component, iterationStack)}
-          </div>
+          </RowComponent>
         );
       }
 
       case 'button': {
-        const rawText = resolveBinding(props?.text, 'Кнопка');
-        const label = resolveProp(props, 'label', null);
-        const textValue = formatForDisplay(label || rawText);
-        const variant = resolveProp(props, 'variant', 'primary');
-        const size = resolveProp(props, 'size', 'medium');
-        const widgetStyle = resolveWidgetStyles('button', { variant, size });
-        const style = mergeStyles(widgetStyle?.style ?? {}, component.style);
-        
-        // Support multiple event formats:
-        // 1. props.event (legacy)
-        // 2. component.event (legacy)
-        // 3. component.events.onClick (new avitoDemo format)
-        const rawEventName = resolveProp(props, 'event', 
-          component?.event ?? 
-          component?.events?.onClick ?? 
-          null
-        );
-        const eventName = typeof rawEventName === 'string' ? rawEventName.trim() : '';
-        
-        // Support eventParams for passing additional data (e.g., itemId)
-        const eventParamsRaw = props?.eventParams || component?.eventParams || {};
-        const eventParams = {};
-        Object.entries(eventParamsRaw).forEach(([key, value]) => {
-          // Resolve bindings in eventParams (e.g., ${cartItem.id})
-          eventParams[key] = resolveBindingValue(value, context, iterationStack);
-        });
-        
-        const disabledProp = Boolean(resolveProp(props, 'disabled', false));
-        const isDisabled = disabledProp || (isEventPending && eventName);
-        const handleClick = () => {
-          trackClick({
-            componentId: component.id ?? null,
-            componentType: component.type,
-            screenId: activeScreenId,
-            screenName: activeScreenName,
-            label: textValue,
-            eventName: eventName || null
-          });
-          if (!eventName || typeof onEvent !== 'function') {
-            return;
-          }
-          // Pass eventParams as second argument
-          onEvent(eventName, eventParams);
-        };
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный ButtonComponent
         return (
-          <button
-            type="button"
-            className={`canvas-button ${variant} ${size}`}
-            style={style}
-            onClick={handleClick}
-            disabled={isDisabled}
-            data-event={eventName || undefined}
-          >
-            {textValue}
-          </button>
+          <ButtonComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            onEvent={onEvent}
+            isEventPending={isEventPending}
+            trackClick={trackClick}
+            activeScreenId={activeScreenId}
+            activeScreenName={activeScreenName}
+          />
         );
       }
 
@@ -434,93 +437,42 @@ const SandboxScreenRenderer = ({
       }
 
       case 'text': {
-        const rawContent = resolveBinding(props?.content, 'Текст');
-        const contentValue = formatForDisplay(rawContent);
-        const variant = resolveProp(props, 'variant', 'body');
-        const color = resolveProp(props, 'color', undefined);
-        const className = `canvas-text ${variant}`;
-        const style = mergeStyles({ color }, component.style);
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный TextComponent
         return (
-          <div className={className} style={style}>
-            {contentValue}
-          </div>
+          <TextComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+          />
         );
       }
 
       case 'input': {
-        const inputType = resolveProp(props, 'type', 'text');
-        const rawPlaceholder = resolveBinding(props?.placeholder, '');
-        const placeholder = formatForDisplay(rawPlaceholder);
-        const required = Boolean(resolveProp(props, 'required', false));
-        const name = resolveProp(props, 'name', component?.name ?? '');
-        const helperText = resolveProp(props, 'helperText', undefined);
-        const resolvedValue = resolveBinding(props?.value, undefined);
-        const valueFromForm = (name && Object.prototype.hasOwnProperty.call(formValues, name))
-          ? formValues[name]
-          : resolvedValue;
-        const value = valueFromForm ?? '';
-        const editable = Boolean(name && typeof onInputChange === 'function');
-        const style = mergeStyles(
-          {
-            width: '100%'
-          },
-          component.style
-        );
-
-        const handleChange = (event) => {
-          trackClick({
-            componentId: component.id ?? null,
-            componentType: component.type,
-            screenId: activeScreenId,
-            screenName: activeScreenName,
-            label: name || placeholder || component.id || 'input',
-            eventName: 'input_change'
-          });
-          if (!editable) {
-            return;
-          }
-          onInputChange(name, event.target.value);
-        };
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный InputComponent
         return (
-          <div className="sandbox-input-wrapper">
-            <input
-              type={inputType}
-              name={name || undefined}
-              placeholder={placeholder}
-              className="canvas-input"
-              style={style}
-              required={required}
-              readOnly={!editable}
-              value={value}
-              onChange={handleChange}
-            />
-            {helperText ? (
-              <p className="sandbox-input-helper">{formatForDisplay(helperText)}</p>
-            ) : null}
-          </div>
+          <InputComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            onInputChange={onInputChange}
+          />
         );
       }
 
       case 'image': {
-        const srcValue = resolveBinding(props?.src, '')
-          || props?.placeholder
-          || 'https://via.placeholder.com/640x360';
-        const altValue = String(resolveBinding(props?.alt, ''));
-        const style = mergeStyles({}, component.style);
-
+        // ✅ ФАЗА 2.4: Используем мемоизированный ImageComponent
         return (
-          <img
-            src={srcValue}
-            alt={altValue || 'Image'}
-            className="canvas-image"
-            style={style}
+          <ImageComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
           />
         );
       }
 
       case 'list': {
+        const props = readProps(component);
+        
         const normalizeItems = (value) => {
           if (Array.isArray(value)) {
             return value;
@@ -557,8 +509,12 @@ const SandboxScreenRenderer = ({
         };
 
         // Support both 'items' (legacy) and 'dataSource' (new format)
-        const rawItems = resolveBinding(props?.dataSource ?? props?.items, []);
+        const dataSource = props?.dataSource ?? props?.items;
+        
+        const rawItems = resolveBindingValue(dataSource, context, [], { iterationStack });
+        
         const itemsArray = normalizeItems(rawItems);
+        
         const variant = resolveProp(props, 'variant', 'unordered');
         const displayPath = resolveProp(props, 'displayPath', undefined);
         const aliasValue = resolveProp(props, 'itemAlias', 'item');
@@ -587,36 +543,134 @@ const SandboxScreenRenderer = ({
         if (templateChildren.length === 0) {
           return (
             <ListTag className="canvas-list" style={style}>
-              {itemsArray.map((item, index) => (
-                <li key={`${component.id}-item-${index}`}>
-                  {formatForDisplay(item, displayPath)}
-                </li>
-              ))}
+              {itemsArray.map((item, index) => {
+                // ✅ ФАЗА 1.1: Используем item.id если доступно для стабильного key
+                const itemKey = (item && typeof item === 'object' && item.id) 
+                  ? `${component.id}-${item.id}` 
+                  : `${component.id}-item-${index}`;
+                
+                return (
+                  <li key={itemKey}>
+                    {formatForDisplay(item, displayPath)}
+                  </li>
+                );
+              })}
             </ListTag>
           );
         }
 
         const total = itemsArray.length;
 
+        // ✅ ФАЗА 3: Виртуализация для больших списков (50+ элементов)
+        if (templateChildren.length > 0 && total >= 50) {
+          // Определяем высоту элемента (можно настроить через props)
+          const itemHeight = parseInt(props?.itemHeight) || 100;
+          const enableVirtualization = props?.enableVirtualization !== false;
+          
+          // Используем hook для управления виртуализацией
+          const { containerHeight, stats } = useVirtualization(itemsArray, {
+            itemHeight,
+            maxHeight: 600,
+            enableVirtualization
+          });
+          
+          // Логируем статистику виртуализации
+          if (stats.shouldVirtualize) {
+            console.log('🚀 [Virtualization] List stats:', {
+              componentId: component.id,
+              ...stats
+            });
+          }
+          
+          // Функция рендеринга одного элемента для виртуализации
+          const renderVirtualItem = ({ index, style: itemStyle, data }) => {
+            const item = data;
+            const frame = { alias, item, index, total };
+            const nextStack = [...iterationStack, frame];
+            
+            const itemKey = (item && typeof item === 'object' && item.id) 
+              ? `${component.id}-${item.id}` 
+              : `${component.id}-item-${index}`;
+            
+            return (
+              <div
+                key={itemKey}
+                style={{ ...itemStyle, listStyle: 'none' }}
+              >
+                {templateChildren.map((child) => {
+                  const childKey = item && typeof item === 'object' && item.id
+                    ? `${child.id || 'child'}-${item.id}`
+                    : `${child.id || 'child'}-${index}`;
+                  
+                  return (
+                    <div
+                      key={childKey}
+                      className="sandbox-component-wrapper"
+                    >
+                      {renderComponent(child, nextStack)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+          
+          // Генератор ключей для элементов
+          const getItemKey = (index, item) => {
+            return (item && typeof item === 'object' && item.id) 
+              ? `${component.id}-${item.id}` 
+              : `${component.id}-item-${index}`;
+          };
+          
+          return (
+            <div className="canvas-list virtualized" style={style}>
+              <SmartList
+                items={itemsArray}
+                renderItem={renderVirtualItem}
+                itemHeight={itemHeight}
+                height={containerHeight}
+                width="100%"
+                overscanCount={5}
+                enableVirtualization={enableVirtualization}
+                itemKey={getItemKey}
+              />
+            </div>
+          );
+        }
+
+        // Обычный рендеринг для небольших списков
         return (
           <ListTag className="canvas-list" style={style}>
             {total > 0 ? (
               itemsArray.map((item, index) => {
                 const frame = { alias, item, index, total };
                 const nextStack = [...iterationStack, frame];
+                
+                // ✅ ФАЗА 1.1: Используем item.id если доступно для стабильного key
+                const itemKey = (item && typeof item === 'object' && item.id) 
+                  ? `${component.id}-${item.id}` 
+                  : `${component.id}-item-${index}`;
+                
                 return (
                   <li
-                    key={`${component.id}-item-${index}`}
+                    key={itemKey}
                     style={{ listStyle: 'none' }}
                   >
-                    {templateChildren.map((child) => (
-                      <div
-                        key={`${child.id || 'child'}-${index}`}
-                        className="sandbox-component-wrapper"
-                      >
-                        {renderComponent(child, nextStack)}
-                      </div>
-                    ))}
+                    {templateChildren.map((child) => {
+                      // ✅ ФАЗА 1.1: Стабильный key для template children
+                      const childKey = item && typeof item === 'object' && item.id
+                        ? `${child.id || 'child'}-${item.id}`
+                        : `${child.id || 'child'}-${index}`;
+                      
+                      return (
+                        <div
+                          key={childKey}
+                          className="sandbox-component-wrapper"
+                        >
+                          {renderComponent(child, nextStack)}
+                        </div>
+                      );
+                    })}
                   </li>
                 );
               })

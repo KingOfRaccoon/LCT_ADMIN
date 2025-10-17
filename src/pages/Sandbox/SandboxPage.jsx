@@ -16,7 +16,7 @@ import {
   getNextStateFromIntegration
 } from './utils/integrationStates';
 import ecommerceDashboard from './data/ecommerceDashboard.json';
-import avitoDemo from './data/avitoDemo.json';
+import avitoDemo from './data/avitoDemo_old.json';
 import {
   ArrowRight,
   GitBranch,

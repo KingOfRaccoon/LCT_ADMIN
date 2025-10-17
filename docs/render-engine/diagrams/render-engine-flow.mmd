@@ -1,0 +1,210 @@
+```mermaid
+graph TD
+    Start[SandboxScreenRenderer Props] --> CheckScreen{screen exists?}
+    
+    CheckScreen -->|No| Empty[Show Empty State]
+    CheckScreen -->|Yes| CalcComponents[useMemo: components]
+    
+    CalcComponents --> CalcMap[useMemo: componentsMap]
+    CalcMap --> FindRoot[useMemo: rootComponent]
+    FindRoot --> CheckFormat{Format?}
+    
+    CheckFormat -->|components[]| UseRoot[Use rootComponent]
+    CheckFormat -->|sections{}| VirtualRoot[useMemo: virtualRoot]
+    
+    UseRoot --> Render[renderComponent]
+    VirtualRoot --> Render
+    
+    Render --> Switch{component.type?}
+    
+    Switch -->|screen| ScreenRender[Render screen container]
+    Switch -->|column| ColumnRender[Render column container]
+    Switch -->|section| SectionRender[Render section container]
+    Switch -->|container| ContainerRender[Render container]
+    Switch -->|row| RowRender[Render row container]
+    Switch -->|button| ButtonRender[Render button + event handler]
+    Switch -->|input| InputRender[Render input + onChange]
+    Switch -->|text| TextRender[Resolve bindings + render text]
+    Switch -->|image| ImageRender[Resolve src + render img]
+    Switch -->|list| ListRender[Iterate + recursive render]
+    Switch -->|default| Unsupported[Show unsupported message]
+    
+    ScreenRender --> HasChildren{has children?}
+    ColumnRender --> HasChildren
+    SectionRender --> HasChildren
+    ContainerRender --> HasChildren
+    RowRender --> HasChildren
+    
+    HasChildren -->|Yes| RenderChildren[renderChildren]
+    HasChildren -->|No| ReturnElement[Return JSX element]
+    
+    RenderChildren --> MapChildren[children.map]
+    MapChildren --> ResolveChild{child type?}
+    
+    ResolveChild -->|string id| LookupMap[componentsMap.get]
+    ResolveChild -->|object| DirectUse[Use directly]
+    
+    LookupMap --> RecursiveRender[Recursive renderComponent]
+    DirectUse --> RecursiveRender
+    
+    RecursiveRender --> Switch
+    
+    ListRender --> NormalizeItems[Normalize items array]
+    NormalizeItems --> MapItems[items.map]
+    MapItems --> CreateFrame[Create iteration frame]
+    CreateFrame --> NextStack[Build iterationStack]
+    NextStack --> RenderTemplate[Render template children]
+    RenderTemplate --> RecursiveRender
+    
+    ButtonRender --> ResolveProps[Resolve props bindings]
+    InputRender --> ResolveProps
+    TextRender --> ResolveProps
+    ImageRender --> ResolveProps
+    
+    ResolveProps --> FormatDisplay[formatForDisplay]
+    FormatDisplay --> CheckBinding{isBindingValue?}
+    
+    CheckBinding -->|Yes| ResolveBinding[resolveBindingValue]
+    CheckBinding -->|No| FormatValue[Format to string]
+    
+    ResolveBinding --> FormatValue
+    FormatValue --> ReturnElement
+    
+    ReturnElement --> FinalRender[Return to React]
+    
+    style Start fill:#e1f5ff
+    style Render fill:#ffe1e1
+    style Switch fill:#fff4e1
+    style RenderChildren fill:#e1ffe1
+    style RecursiveRender fill:#ffe1f0
+    style ResolveBinding fill:#f0e1ff
+    style FinalRender fill:#e1ffe1
+```
+
+```mermaid
+sequenceDiagram
+    participant Parent as Parent Component
+    participant Renderer as SandboxScreenRenderer
+    participant React as React Reconciler
+    participant DOM as Browser DOM
+    
+    Note over Parent,DOM: Initial Render
+    
+    Parent->>Renderer: screen={...}, context={...}
+    activate Renderer
+    
+    Renderer->>Renderer: useMemo(components)
+    Renderer->>Renderer: useMemo(componentsMap)
+    Renderer->>Renderer: useMemo(rootComponent)
+    Renderer->>Renderer: useMemo(virtualRoot)
+    
+    Note over Renderer: Start rendering tree
+    
+    Renderer->>Renderer: renderComponent(root)
+    
+    loop For each component
+        Renderer->>Renderer: switch(type)
+        Renderer->>Renderer: resolveBindings
+        Renderer->>Renderer: formatForDisplay
+        
+        alt Has children
+            Renderer->>Renderer: renderChildren()
+            loop For each child
+                Renderer->>Renderer: recursive renderComponent
+            end
+        end
+    end
+    
+    Renderer->>React: Return JSX tree
+    deactivate Renderer
+    
+    React->>DOM: Create/Update DOM nodes
+    DOM-->>Parent: Render complete
+    
+    Note over Parent,DOM: Context Update (NO incremental!)
+    
+    Parent->>Renderer: context={...updated...}
+    activate Renderer
+    
+    Note over Renderer: ALL memos recalculate!
+    Renderer->>Renderer: useMemo(components) ✓
+    Renderer->>Renderer: useMemo(componentsMap) ✓
+    Renderer->>Renderer: useMemo(rootComponent) ✓
+    Renderer->>Renderer: useMemo(virtualRoot) ✓
+    
+    Note over Renderer: FULL re-render!
+    Renderer->>Renderer: renderComponent(root)
+    
+    loop Every component again
+        Renderer->>Renderer: switch(type)
+        Renderer->>Renderer: resolveBindings (AGAIN!)
+        Renderer->>Renderer: formatForDisplay (AGAIN!)
+    end
+    
+    Renderer->>React: Return NEW JSX tree
+    deactivate Renderer
+    
+    React->>React: Virtual DOM diff
+    React->>DOM: Apply minimal DOM updates
+    DOM-->>Parent: Update complete
+```
+
+```mermaid
+graph LR
+    subgraph "Current Performance Issues"
+        A[Context Change] --> B[Full Re-render]
+        B --> C[All bindings resolve again]
+        B --> D[All styles recalculate]
+        B --> E[All children re-render]
+        C --> F[Slow]
+        D --> F
+        E --> F
+    end
+    
+    subgraph "Proposed Optimization"
+        A2[Context Change] --> Diff[Screen Diff]
+        Diff --> Check{Same screen?}
+        Check -->|Yes| Incremental[Incremental Update]
+        Check -->|No| Full[Full Replace]
+        
+        Incremental --> Cache[Binding Cache]
+        Incremental --> Memo[Component Memoization]
+        Incremental --> Smart[Smart Keys]
+        
+        Cache --> Fast[Fast ⚡]
+        Memo --> Fast
+        Smart --> Fast
+        Full --> Fast
+    end
+    
+    style A fill:#ffcccc
+    style F fill:#ffcccc
+    style A2 fill:#ccffcc
+    style Fast fill:#ccffcc
+```
+
+```mermaid
+graph TB
+    subgraph "List Rendering - Current"
+        L1[list component] --> L2[itemsArray.map]
+        L2 --> L3[For each item]
+        L3 --> L4[Create iterationStack]
+        L4 --> L5[templateChildren.map]
+        L5 --> L6[renderComponent for each child]
+        L6 --> L7[NEW render every time]
+        
+        style L7 fill:#ffcccc
+    end
+    
+    subgraph "List Rendering - Optimized"
+        O1[list component] --> O2[itemsArray.map]
+        O2 --> O3[For each item]
+        O3 --> O4[MemoizedListItem]
+        O4 --> O5{item changed?}
+        O5 -->|No| O6[Skip render ✓]
+        O5 -->|Yes| O7[Render only changed]
+        
+        style O6 fill:#ccffcc
+        style O7 fill:#ffffcc
+    end
+```

@@ -202,7 +202,7 @@
           "method": "post",
           "body": {
             "cart_id": 3,
-            "advertisement_id": 10
+            "advertisement_id": 9
           },
           "metadata": {
             "description": "Добавляет товар в корзину пользователя",

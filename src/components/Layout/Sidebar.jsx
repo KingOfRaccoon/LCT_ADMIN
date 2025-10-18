@@ -9,7 +9,8 @@ import {
   ChevronRight,
   FlaskConical,
   PlayCircle,
-  BarChart3
+  BarChart3,
+  GitBranch
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
 import './Sidebar.css';
@@ -37,6 +38,13 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
           icon: Package,
           path: '/products',
           active: currentPath === '/products'
+        },
+        {
+          label: 'Subflows',
+          icon: GitBranch,
+          path: '/subflows',
+          active: currentPath === '/subflows',
+          badge: '🔥 NEW'
         },
         {
           label: 'Sandbox',
@@ -129,6 +137,9 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
                     {!collapsed && (
                       <>
                         <span>{item.label}</span>
+                        {item.badge && (
+                          <span className="nav-badge">{item.badge}</span>
+                        )}
                         {item.hasSubmenu && <ChevronRight size={16} />}
                       </>
                     )}

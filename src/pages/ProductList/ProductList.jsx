@@ -73,6 +73,18 @@ const ProductList = () => {
         createdBy: 'aleksandrzvezdakov',
         screens: 11,
         actions: 25
+      },
+      {
+        id: 'avito-cart-demo-subflow',
+        name: 'Авито — Корзина с Subflow',
+        description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): Input/Output mapping, dependent variables, изолированный контекст',
+        status: 'active',
+        version: '1.0.0',
+        lastModified: '2024-10-18T10:00:00Z',
+        createdBy: 'aleksandrzvezdakov',
+        screens: 13,
+        actions: 27,
+        badge: '🔥 NEW'
       }
     ];
     
@@ -243,7 +255,12 @@ const ProductList = () => {
                 <div key={product.id} className="product-card">
                   <div className="card-header">
                     <div className="card-title">
-                      <h3>{product.name}</h3>
+                      <h3>
+                        {product.name}
+                        {product.badge && (
+                          <span className="product-badge">{product.badge}</span>
+                        )}
+                      </h3>
                       {getStatusBadge(product.status)}
                     </div>
                     

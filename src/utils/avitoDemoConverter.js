@@ -71,6 +71,7 @@ export function convertAvitoDemoNodesToReactFlow(avitoDemoNodes) {
     const hasTransitions = node.transitions && node.transitions.length > 0;
     const isFinal = !hasEdges && !hasTransitions;
     const isTechnical = node.type === 'technical' || node.state_type === 'technical';
+    const isSubflow = node.type === 'subflow' || node.state_type === 'subflow';
 
     // Базовая структура узла
     const reactFlowNode = {
@@ -92,6 +93,36 @@ export function convertAvitoDemoNodesToReactFlow(avitoDemoNodes) {
         description: node.data?.description || node.description
       }
     };
+
+    // Для Subflow узлов добавляем специальную информацию
+    if (isSubflow) {
+      reactFlowNode.data.expressions = node.expressions?.map(expr => ({
+        variable: expr.variable,
+        subflow_workflow_id: expr.subflow_workflow_id,
+        input_mapping: expr.input_mapping || {},
+        output_mapping: expr.output_mapping || {},
+        dependent_variables: expr.dependent_variables || [],
+        error_variable: expr.error_variable,
+        metadata: expr.metadata
+      })) || [];
+      reactFlowNode.data.transitions = normalizeTransitions(node.transitions);
+      reactFlowNode.data.name = node.name;
+      
+      // Метаданные Subflow состояния
+      if (node.metadata) {
+        reactFlowNode.data.stateMetadata = {
+          description: node.metadata.description,
+          category: node.metadata.category,
+          tags: node.metadata.tags || [],
+          author: node.metadata.author,
+          version: node.metadata.version
+        };
+      }
+      
+      // Добавляем transitions на верхний уровень для маппера
+      reactFlowNode.transitions = node.transitions || [];
+      reactFlowNode.expressions = node.expressions || [];
+    }
 
     // Для технических узлов добавляем expressions и transitions
     if (isTechnical) {
@@ -141,6 +172,7 @@ export function convertAvitoDemoEdgesToReactFlow(avitoDemoNodes) {
 
   avitoDemoNodes.forEach(node => {
     const isTechnical = node.type === 'technical' || node.state_type === 'technical';
+    const isSubflow = node.type === 'subflow' || node.state_type === 'subflow';
 
     // Обработка стандартных edges (для screen и action узлов)
     if (node.edges && Array.isArray(node.edges)) {
@@ -163,7 +195,39 @@ export function convertAvitoDemoEdgesToReactFlow(avitoDemoNodes) {
       });
     }
 
-        // Обработка transitions для технических узлов (новая логика)
+    // Обработка transitions для Subflow узлов
+    if (isSubflow && node.transitions && Array.isArray(node.transitions)) {
+      node.transitions.forEach((transition, transIdx) => {
+        const targetStateId = transition.state_id || transition.target;
+        if (!targetStateId) return;
+
+        const variableName = transition.variable || 'result';
+        const isErrorTransition = node.expressions?.[0]?.error_variable === variableName;
+
+        edges.push({
+          id: `${node.id}-subflow-transition-${transIdx}`,
+          source: node.id,
+          target: targetStateId,
+          label: isErrorTransition ? `Error: ${variableName}` : variableName,
+          type: 'smoothstep',
+          animated: true,
+          style: {
+            stroke: isErrorTransition ? '#ef4444' : '#8B5CF6',
+            strokeWidth: 2,
+            strokeDasharray: isErrorTransition ? '5,5' : undefined
+          },
+          data: {
+            transitionType: 'subflow',
+            variable: variableName,
+            case: transition.case,
+            isError: isErrorTransition,
+            subflow_workflow_id: node.expressions?.[0]?.subflow_workflow_id
+          }
+        });
+      });
+    }
+
+    // Обработка transitions для технических узлов (новая логика)
     if (isTechnical && node.transitions && Array.isArray(node.transitions)) {
       node.transitions.forEach((transition, transIdx) => {
         const variables = Array.isArray(transition.variable) ? transition.variable :
@@ -318,6 +382,114 @@ export async function loadAvitoDemoAsGraphData(options = {}) {
       validation: {
         performed: false,
         technicalNodesCount: 0,
+        errors: [{ error: error.message }],
+        warnings: []
+      }
+    };
+  }
+}
+
+/**
+ * Загружает avitoDemoSubflow.json и преобразует в GraphData для ReactFlow
+ * @param {Object} options - Опции загрузки
+ * @param {boolean} options.validate - Выполнять ли валидацию технических узлов
+ * @param {boolean} options.verbose - Логировать ли предупреждения
+ * @returns {Promise<{nodes: Array, edges: Array, initialContext: Object, screens: Object, variableSchemas: Object, validation: Object}>}
+ */
+export async function loadAvitoDemoSubflowAsGraphData(options = {}) {
+  const { validate = false, verbose = false } = options;
+
+  try {
+    // Динамический импорт JSON
+    const avitoDemoSubflow = await import('../pages/Sandbox/data/avitoDemoSubflow.json');
+    const data = avitoDemoSubflow.default;
+
+    const nodes = convertAvitoDemoNodesToReactFlow(data.nodes || []);
+    const edges = convertAvitoDemoEdgesToReactFlow(data.nodes || []);
+
+    // Валидация технических узлов
+    const validationResults = {
+      performed: validate,
+      technicalNodesCount: 0,
+      subflowNodesCount: 0,
+      errors: [],
+      warnings: []
+    };
+
+    if (validate) {
+      const contextSchema = data.variableSchemas || {};
+      
+      (data.nodes || []).forEach(node => {
+        const isTechnical = node.type === 'technical' || node.state_type === 'technical';
+        const isSubflow = node.type === 'subflow' || node.state_type === 'subflow';
+        
+        if (isSubflow) {
+          validationResults.subflowNodesCount++;
+          if (verbose) {
+            console.log(`[Subflow Node] ${node.name || node.id}:`, {
+              id: node.id,
+              subflow_workflow_id: node.expressions?.[0]?.subflow_workflow_id,
+              input_mapping: node.expressions?.[0]?.input_mapping,
+              output_mapping: node.expressions?.[0]?.output_mapping
+            });
+          }
+        }
+        
+        if (isTechnical) {
+          validationResults.technicalNodesCount++;
+          const validation = validateTechnicalNode(node, contextSchema);
+          
+          if (!validation.valid) {
+            validationResults.errors.push({
+              nodeId: node.id,
+              nodeName: node.name || node.id,
+              errors: validation.errors
+            });
+          }
+
+          if (verbose) {
+            const metadata = extractTechnicalNodeMetadata(node);
+            console.log(`[Technical Node] ${metadata.name}:`, metadata);
+          }
+        }
+      });
+
+      if (validationResults.errors.length > 0) {
+        console.warn('[avitoDemoSubflow] Validation errors found:', validationResults.errors);
+      }
+
+      if (verbose) {
+        if (validationResults.technicalNodesCount > 0) {
+          console.log(`[avitoDemoSubflow] Validated ${validationResults.technicalNodesCount} technical node(s)`);
+        }
+        if (validationResults.subflowNodesCount > 0) {
+          console.log(`[avitoDemoSubflow] Found ${validationResults.subflowNodesCount} subflow node(s)`);
+        }
+      }
+    }
+
+    return {
+      nodes,
+      edges,
+      initialContext: data.initialContext || {},
+      variableSchemas: data.variableSchemas || {},
+      screens: data.screens || {},
+      subflows: data.subflows || {},
+      validation: validationResults
+    };
+  } catch (error) {
+    console.error('Failed to load avitoDemoSubflow:', error);
+    return {
+      nodes: [],
+      edges: [],
+      initialContext: {},
+      variableSchemas: {},
+      screens: {},
+      subflows: {},
+      validation: {
+        performed: false,
+        technicalNodesCount: 0,
+        subflowNodesCount: 0,
         errors: [{ error: error.message }],
         warnings: []
       }

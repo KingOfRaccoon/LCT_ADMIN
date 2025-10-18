@@ -683,6 +683,34 @@ const SandboxScreenRenderer = ({
         );
       }
 
+      case 'divider': {
+        // Render horizontal divider/separator
+        const computedStyles = mergeStyles(
+          {
+            borderTop: '1px solid #E5E5E5',
+            margin: '8px 0',
+            width: '100%'
+          },
+          component.style
+        );
+
+        return <div style={computedStyles} />;
+      }
+
+      case 'conditional': {
+        // Evaluate condition
+        const condition = resolveProp(props, 'condition', false);
+        const shouldRender = Boolean(condition);
+
+        // Render children only if condition is true
+        if (shouldRender) {
+          return <>{renderChildren(component, iterationStack)}</>;
+        }
+
+        // Return null if condition is false
+        return null;
+      }
+
       default:
         return (
           <div className="sandbox-unsupported">

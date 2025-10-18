@@ -8,6 +8,7 @@ import ScreenBuilder from './pages/ScreenBuilder/ScreenBuilder';
 import SandboxPage from './pages/Sandbox/SandboxPage';
 import PreviewPage from './pages/Preview/PreviewPage';
 import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
+import SubflowsPage from './pages/Subflows/SubflowsPage';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 
@@ -36,6 +37,9 @@ function App() {
 
               {/* Preview */}
               <Route path="/preview" element={<PreviewPage />} />
+
+              {/* Subflows Management */}
+              <Route path="/subflows" element={<SubflowsPage />} />
               
               {/* 1. Product List Page */}
               <Route path="/products" element={<ProductList />} />

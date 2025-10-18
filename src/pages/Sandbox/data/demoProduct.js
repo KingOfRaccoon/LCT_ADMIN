@@ -1,9 +1,15 @@
-// import ecommerceDashboard from './ecommerceDashboard.json';
-import avitoDemo from './avitoDemo.json';
+/**
+ * Демо-продукт для Sandbox
+ * Теперь использует централизованный список продуктов из products.js
+ */
+import { defaultProduct, getDefaultProduct } from './products';
 
-// Switch between presets: ecommerceDashboard | avitoDemo
-export const demoProduct = avitoDemo;
-export default avitoDemo;
+// Экспортируем продукт по умолчанию (featured)
+export const demoProduct = defaultProduct;
+export default defaultProduct;
+
+// Также экспортируем функцию получения метаданных продукта
+export { getDefaultProduct };
 
 /* Legacy inline dataset retained for reference.
 const legacyEcommerceDashboard = {

@@ -24,6 +24,9 @@ function detectStateType(node) {
   if (stateType === 'technical' || nodeType === 'technical') {
     return 'technical';
   }
+  if (stateType === 'subflow' || nodeType === 'subflow') {
+    return 'subflow';
+  }
   if (stateType === 'screen' || nodeType === 'screen') {
     return 'screen';
   }
@@ -129,14 +132,14 @@ function createTechnicalExpressions(nodeData) {
  * @returns {IntegrationExpression[]}
  */
 function createIntegrationExpressions(node, nodeData) {
-  // Если expressions уже есть на верхнем уровне узла - используем их
+  // Если expressions уже есть на верхнем уровне узла - нормализуем и возвращаем
   if (Array.isArray(node.expressions) && node.expressions.length > 0) {
-    return node.expressions;
+    return node.expressions.map(expr => normalizeIntegrationExpression(expr));
   }
 
-  // Если expressions в nodeData - используем их
+  // Если expressions в nodeData - нормализуем и возвращаем
   if (Array.isArray(nodeData.expressions) && nodeData.expressions.length > 0) {
-    return nodeData.expressions;
+    return nodeData.expressions.map(expr => normalizeIntegrationExpression(expr));
   }
 
   // Иначе создаём из config
@@ -147,15 +150,105 @@ function createIntegrationExpressions(node, nodeData) {
   const resultVariable = config.resultVariable || config.variable || 'api_result';
 
   if (config.url) {
-    expressions.push({
+    const expr = {
       variable: resultVariable,
       url: config.url,
       params: config.params || {},
       method: config.method?.toLowerCase() || 'get'
-    });
+    };
+    
+    expressions.push(normalizeIntegrationExpression(expr));
   }
 
   return expressions;
+}
+
+/**
+ * Нормализует IntegrationExpression - перемещает body в params для DELETE/GET
+ * @param {Object} expr - Expression для нормализации
+ * @returns {Object} Нормализованный expression
+ */
+function normalizeIntegrationExpression(expr) {
+  const method = expr.method?.toLowerCase();
+  
+  // Если метод DELETE или GET и есть body - перемещаем в params
+  if ((method === 'delete' || method === 'get') && expr.body) {
+    return {
+      ...expr,
+      params: { ...(expr.params || {}), ...expr.body },
+      body: undefined
+    };
+  }
+  
+  return expr;
+}
+
+/**
+ * Создает expressions для subflow состояния
+ * @param {Object} node - Узел целиком
+ * @param {Object} nodeData - Данные узла
+ * @returns {SubflowExpression[]}
+ */
+function createSubflowExpressions(node, nodeData) {
+  // Если expressions уже есть на верхнем уровне узла - нормализуем и используем их
+  if (Array.isArray(node.expressions) && node.expressions.length > 0) {
+    return node.expressions.map(expr => normalizeSubflowExpression(expr, node));
+  }
+
+  // Если expressions в nodeData - нормализуем и используем их
+  if (Array.isArray(nodeData.expressions) && nodeData.expressions.length > 0) {
+    return nodeData.expressions.map(expr => normalizeSubflowExpression(expr, node));
+  }
+
+  // Создаём из config или data
+  const config = nodeData.config || nodeData;
+  const expressions = [];
+
+  if (config.subflow_workflow_id) {
+    const expr = {
+      subflow_workflow_id: config.subflow_workflow_id,
+      input_mapping: config.input_mapping || {},
+      output_mapping: config.output_mapping || {},
+      dependent_variables: config.dependent_variables || [],
+      error_variable: config.error_variable || null
+    };
+    
+    expressions.push(normalizeSubflowExpression(expr, node));
+  }
+
+  return expressions;
+}
+
+/**
+ * Нормализует SubflowExpression - добавляет поле variable если его нет
+ * @param {Object} expr - Expression для нормализации
+ * @param {Object} node - Узел целиком (для получения имени переменной из transitions)
+ * @returns {Object} Нормализованный expression
+ */
+function normalizeSubflowExpression(expr, node) {
+  // Если variable уже есть - используем как есть
+  if (expr.variable) {
+    return expr;
+  }
+
+  // Пытаемся найти имя переменной из transitions
+  let variableName = 'subflow_result'; // по умолчанию
+  
+  if (Array.isArray(node.transitions) && node.transitions.length > 0) {
+    // Берём первый не-error transition
+    const firstTransition = node.transitions.find(t => 
+      t.variable && t.variable !== expr.error_variable
+    );
+    
+    if (firstTransition && firstTransition.variable) {
+      variableName = firstTransition.variable;
+    }
+  }
+
+  return {
+    variable: variableName,
+    ...expr
+  };
 }
 
 /**
@@ -309,6 +402,8 @@ function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName, 
     expressions = createTechnicalExpressions(nodeData);
   } else if (stateType === 'integration') {
     expressions = createIntegrationExpressions(node, nodeData);
+  } else if (stateType === 'subflow') {
+    expressions = createSubflowExpressions(node, nodeData);
   } else if (stateType === 'screen') {
     expressions = createScreenExpressions(nodeData, outgoingEdges);
   }
@@ -339,17 +434,13 @@ function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName, 
     transitions = createTransitions(outgoingEdges, stateType, nodeIdToName, nodeData);
   }
 
-  // Базовый объект состояния
+  // Базовый объект состояния с правильным порядком полей
   const state = {
     state_type: stateType,
-    name: node.label || nodeData.label || node.id,
-    initial_state: node.start === true || initialNodes.has(node.id),
-    final_state: node.final === true || finalNodes.has(node.id),
-    expressions: expressions,
-    transitions: transitions
+    name: node.label || nodeData.label || node.id
   };
 
-  // Добавляем screen данные ТОЛЬКО для screen состояний
+  // Добавляем screen - для screen состояний с данными, для subflow/technical/integration пустой объект
   if (stateType === 'screen') {
     if (nodeData.screenId && screens[nodeData.screenId]) {
       state.screen = screens[nodeData.screenId];
@@ -365,7 +456,25 @@ function mapNodeToState(node, allEdges, initialNodes, finalNodes, nodeIdToName, 
         });
       }
     }
+  } else if (stateType === 'subflow') {
+    // Для subflow screen всегда пустой объект (по контракту)
+    state.screen = {};
   }
+
+  // Добавляем transitions
+  state.transitions = transitions;
+
+  // Добавляем expressions
+  state.expressions = expressions;
+
+  // Добавляем events - для subflow всегда пустой массив
+  if (stateType === 'subflow') {
+    state.events = [];
+  }
+
+  // Добавляем initial_state и final_state в конце
+  state.initial_state = node.start === true || initialNodes.has(node.id);
+  state.final_state = node.final === true || finalNodes.has(node.id);
 
   return state;
 }

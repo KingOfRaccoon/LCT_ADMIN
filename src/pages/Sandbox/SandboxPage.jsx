@@ -16,7 +16,10 @@ import {
   getNextStateFromIntegration
 } from './utils/integrationStates';
 import ecommerceDashboard from './data/ecommerceDashboard.json';
-import avitoDemo from './data/avitoDemo_old.json';
+import avitoDemo from './data/avitoDemo.json';
+import avitoDemoSubflow from './data/avitoDemoSubflow.json';
+import { getDefaultProduct, getProductById } from './data/products';
+import ProductSelector from './components/ProductSelector';
 import {
   ArrowRight,
   GitBranch,
@@ -197,6 +200,9 @@ const SandboxPage = () => {
   const [apiMode, setApiMode] = useState(runtimeProduct ? 'disabled' : 'checking');
   const [apiData, setApiData] = useState(null);
   const [apiError, setApiError] = useState(null);
+  
+  // Состояние выбранного продукта (если нет runtime данных)
+  const [selectedProductId, setSelectedProductId] = useState(null);
   const [activeWorkflowId, setActiveWorkflowId] = useState("68dedc98ea73d715d90e40dd"); // Для Client Workflow API
   
   // ✅ ИСПРАВЛЕНИЕ: Если есть URL params с workflow_id, используем Client Workflow API напрямую
@@ -291,8 +297,10 @@ const SandboxPage = () => {
     setApiMode('checking');
   }, [runtimeProduct]);
 
-  // Приоритет: workflowData > runtimeProduct > avitoDemo
-  const product = workflowData || runtimeProduct || avitoDemo;
+  // Приоритет: workflowData > runtimeProduct > selectedProduct > defaultProduct
+  const selectedProduct = selectedProductId ? getProductById(selectedProductId)?.data : null;
+  const defaultProductData = getDefaultProduct()?.data || avitoDemoSubflow;
+  const product = workflowData || runtimeProduct || selectedProduct || defaultProductData;
   const nodesById = useMemo(() => {
     const map = new Map();
     (product?.nodes ?? []).forEach((node) => {
@@ -491,6 +499,18 @@ const SandboxPage = () => {
     setHistory([]);
     setFormValues(product?.initialContext?.inputs ? { ...product.initialContext.inputs } : {});
   }, [product]);
+
+  const handleProductChange = useCallback((productId) => {
+    setSelectedProductId(productId);
+    // После смены продукта сбрасываем состояние
+    const newProduct = getProductById(productId)?.data;
+    if (newProduct) {
+      setContextState(cloneContext(newProduct.initialContext));
+      setCurrentNodeId(getInitialNodeId(newProduct));
+      setHistory([]);
+      setFormValues(newProduct?.initialContext?.inputs ? { ...newProduct.initialContext.inputs } : {});
+    }
+  }, []);
 
   const handleInputChange = useCallback((name, value) => {
     if (!name) {
@@ -946,6 +966,15 @@ const SandboxPage = () => {
             <p>{product.description}</p>
           </div>
           <div className="sandbox-header-actions">
+            {/* Селектор продуктов (если не загружен через API или location.state) */}
+            {!workflowData && !runtimeProduct && (
+              <ProductSelector
+                currentProductId={selectedProductId || getDefaultProduct()?.id}
+                onProductChange={handleProductChange}
+                disabled={false}
+              />
+            )}
+            
             {/* Кнопка экспорта workflow */}
             <WorkflowExportButton
               graphData={{

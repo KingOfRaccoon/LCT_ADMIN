@@ -9,9 +9,10 @@
       "schema": {
         "id": "number",
         "user_id": "number",
-        "advertisements": "array",
-        "total_price": "number",
-        "selected_count": "number"
+        "shop_groups": "array",
+        "total_amount": "number",
+        "selected_items_count": "number",
+        "total_items_count": "number"
       }
     },
     "store": {
@@ -52,10 +53,11 @@
   "initialContext": {
     "cart_response": {
       "id": 3,
-      "user_id": 14,
-      "advertisements": [],
-      "total_price": 0,
-      "selected_count": 0
+      "user_id": 4,
+      "shop_groups": [],
+      "total_amount": 0,
+      "selected_items_count": 0,
+      "total_items_count": 0
     },
     "store": {
       "id": 14,
@@ -230,13 +232,11 @@
       "expressions": [
         {
           "variable": "add_to_cart_response",
-          "url": "https://sandkittens.me/backservices/api/carts/update-quantity",
+          "url": "https://sandkittens.me/backservices/api/carts/3/items/${selected_item_id}",
           "params": {},
           "method": "patch",
           "body": {
-            "cart_id": 3,
-            "advertisement_id": "${selected_item_id}",
-            "quantity_change": 1
+            "quantity": "${quantity_change + 1}"
           },
           "metadata": {
             "description": "Увеличивает количество товара на 1",
@@ -264,13 +264,11 @@
       "expressions": [
         {
           "variable": "add_to_cart_response",
-          "url": "https://sandkittens.me/backservices/api/carts/update-quantity",
+          "url": "https://sandkittens.me/backservices/api/carts/3/items/${selected_item_id}",
           "params": {},
           "method": "patch",
           "body": {
-            "cart_id": 3,
-            "advertisement_id": "${selected_item_id}",
-            "quantity_change": -1
+            "quantity": "${quantity_change - 1}"
           },
           "metadata": {
             "description": "Уменьшает количество товара на 1",
@@ -298,13 +296,9 @@
       "expressions": [
         {
           "variable": "add_to_cart_response",
-          "url": "https://sandkittens.me/backservices/api/carts/remove-advertisement",
+          "url": "https://sandkittens.me/backservices/api/carts/3/advertisements/${selected_item_id}",
           "params": {},
           "method": "delete",
-          "body": {
-            "cart_id": 3,
-            "advertisement_id": "${selected_item_id}"
-          },
           "metadata": {
             "description": "Удаляет товар из корзины",
             "category": "data",
@@ -331,12 +325,11 @@
       "expressions": [
         {
           "variable": "add_to_cart_response",
-          "url": "https://sandkittens.me/backservices/api/carts/toggle-focus",
+          "url": "https://sandkittens.me/backservices/api/carts/3/items/${selected_item_id}",
           "params": {},
           "method": "patch",
           "body": {
-            "cart_id": 3,
-            "advertisement_id": "${selected_item_id}"
+            "selected": "${!product.selected}"
           },
           "metadata": {
             "description": "Переключает участие товара в расчете стоимости",
@@ -381,26 +374,75 @@
           "type": "Section",
           "properties": {
             "slot": "header",
-            "padding": 16,
-            "spacing": 12,
+            "padding": 0,
+            "spacing": 0,
             "background": "#ffffff"
           },
           "style": {
-            "borderBottom": "1px solid #E5E5E5"
+            "borderBottom": "none"
           },
           "children": [
             {
-              "id": "text-cart-title",
-              "type": "text",
+              "id": "row-navbar",
+              "type": "row",
               "properties": {
-                "content": "Корзина",
-                "variant": "heading"
+                "spacing": 12,
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "padding": 16
               },
               "style": {
-                "fontSize": "24px",
-                "fontWeight": 700,
-                "color": "#2F3034"
-              }
+                "height": "48px",
+                "borderBottom": "1px solid #E5E5E5"
+              },
+              "children": [
+                {
+                  "id": "button-back",
+                  "type": "button",
+                  "properties": {
+                    "text": "←",
+                    "variant": "link",
+                    "event": "goBack"
+                  },
+                  "style": {
+                    "fontSize": "24px",
+                    "fontWeight": 400,
+                    "color": "#0A74F0",
+                    "background": "transparent",
+                    "border": "none",
+                    "cursor": "pointer",
+                    "padding": "0",
+                    "width": "40px",
+                    "textAlign": "left"
+                  }
+                },
+                {
+                  "id": "text-cart-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Корзина",
+                    "variant": "heading"
+                  },
+                  "style": {
+                    "fontSize": "17px",
+                    "fontWeight": 600,
+                    "color": "#2F3034",
+                    "flex": "1",
+                    "textAlign": "center"
+                  }
+                },
+                {
+                  "id": "spacer-right",
+                  "type": "text",
+                  "properties": {
+                    "content": "",
+                    "variant": "body"
+                  },
+                  "style": {
+                    "width": "40px"
+                  }
+                }
+              ]
             },
             {
               "id": "row-cart-actions",
@@ -408,24 +450,77 @@
               "properties": {
                 "spacing": 12,
                 "alignItems": "center",
-                "justifyContent": "space-between"
+                "justifyContent": "space-between",
+                "padding": 16
+              },
+              "style": {
+                "height": "42px"
               },
               "children": [
                 {
-                  "id": "text-store-name",
-                  "type": "text",
+                  "id": "row-select-all",
+                  "type": "row",
                   "properties": {
-                    "content": {
-                      "reference": "${store.name}",
-                      "value": "Магазин"
-                    },
-                    "variant": "body"
+                    "spacing": 8,
+                    "alignItems": "center"
                   },
-                  "style": {
-                    "fontSize": "15px",
-                    "color": "#000000",
-                    "fontWeight": 400
-                  }
+                  "children": [
+                    {
+                      "id": "checkbox-select-all",
+                      "type": "checkbox",
+                      "properties": {
+                        "checked": {
+                          "reference": "${cart_response.selected_items_count === cart_response.total_items_count && cart_response.total_items_count > 0}",
+                          "value": false
+                        },
+                        "event": "toggleSelectAll"
+                      },
+                      "style": {
+                        "width": "20px",
+                        "height": "20px"
+                      }
+                    },
+                    {
+                      "id": "text-select-all",
+                      "type": "text",
+                      "properties": {
+                        "content": "Выбрать всё",
+                        "variant": "body"
+                      },
+                      "style": {
+                        "fontSize": "15px",
+                        "color": "#000000",
+                        "fontWeight": 400
+                      }
+                    },
+                    {
+                      "id": "button-delete-selected",
+                      "type": "button",
+                      "properties": {
+                        "text": {
+                          "reference": "Удалить (${cart_response.selected_items_count})",
+                          "value": "Удалить (0)"
+                        },
+                        "variant": "link",
+                        "event": "deleteSelected",
+                        "disabled": {
+                          "reference": "${cart_response.selected_items_count === 0}",
+                          "value": true
+                        }
+                      },
+                      "style": {
+                        "fontSize": "15px",
+                        "fontWeight": 400,
+                        "color": "#0A74F0",
+                        "background": "transparent",
+                        "border": "none",
+                        "cursor": "pointer",
+                        "textDecoration": "none",
+                        "padding": "0",
+                        "marginLeft": "8px"
+                      }
+                    }
+                  ]
                 }
               ]
             }
@@ -450,8 +545,8 @@
               "type": "conditional",
               "properties": {
                 "condition": {
-                  "reference": "${cart_response.advertisements.length === 0}",
-                  "value": true
+                  "reference": "${(cart_response.shop_groups || []).length === 0}",
+                  "value": false
                 }
               },
               "children": [
@@ -478,7 +573,8 @@
                       "style": {
                         "width": "200px",
                         "height": "200px",
-                        "borderRadius": "50%"
+                        "borderRadius": "50%",
+                        "objectFit": "cover"
                       }
                     },
                     {
@@ -518,8 +614,8 @@
               "type": "conditional",
               "properties": {
                 "condition": {
-                  "reference": "${cart_response.advertisements.length > 0}",
-                  "value": false
+                  "reference": "${(cart_response.shop_groups || []).length > 0}",
+                  "value": true
                 }
               },
               "children": [
@@ -531,21 +627,110 @@
                   },
                   "children": [
                     {
-                      "id": "list-cart-items",
+                      "id": "list-shop-groups",
                       "type": "list",
                       "properties": {
                         "dataSource": {
-                          "reference": "${cart_response.advertisements}",
+                          "reference": "${cart_response.shop_groups}",
                           "value": []
                         },
-                        "itemAlias": "product"
+                        "itemAlias": "shop"
                       },
                       "style": {
                         "display": "flex",
                         "flexDirection": "column",
-                        "gap": "12px"
+                        "gap": "24px"
                       },
                       "children": [
+                        {
+                          "id": "column-shop-group-{{itemIndex}}",
+                          "type": "column",
+                          "properties": {
+                            "spacing": 12
+                          },
+                          "children": [
+                            {
+                              "id": "text-shop-name-{{itemIndex}}",
+                              "type": "row",
+                              "properties": {
+                                "spacing": 8,
+                                "alignItems": "center"
+                              },
+                              "style": {
+                                "marginBottom": "8px"
+                              },
+                              "children": [
+                                {
+                                  "id": "checkbox-shop-{{itemIndex}}",
+                                  "type": "checkbox",
+                                  "properties": {
+                                    "checked": {
+                                      "reference": "${shop.selected}",
+                                      "value": true
+                                    },
+                                    "event": "toggleShopSelection",
+                                    "eventParams": {
+                                      "shop_id": {
+                                        "reference": "${shop.shop_id}",
+                                        "value": 0
+                                      }
+                                    }
+                                  },
+                                  "style": {
+                                    "width": "20px",
+                                    "height": "20px"
+                                  }
+                                },
+                                {
+                                  "id": "text-shop-name-label-{{itemIndex}}",
+                                  "type": "text",
+                                  "properties": {
+                                    "content": {
+                                      "reference": "${shop.shop_name}",
+                                      "value": "Магазин"
+                                    },
+                                    "variant": "heading"
+                                  },
+                                  "style": {
+                                    "fontSize": "17px",
+                                    "fontWeight": 600,
+                                    "color": "#2F3034"
+                                  }
+                                },
+                                {
+                                  "id": "text-shop-rating-{{itemIndex}}",
+                                  "type": "text",
+                                  "properties": {
+                                    "content": {
+                                      "reference": "⭐ ${shop.rating} (${shop.reviews_count})",
+                                      "value": "⭐ 5.0 (0)"
+                                    },
+                                    "variant": "caption"
+                                  },
+                                  "style": {
+                                    "fontSize": "13px",
+                                    "fontWeight": 400,
+                                    "color": "#8E8E93"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "list-cart-items-{{itemIndex}}",
+                              "type": "list",
+                              "properties": {
+                                "dataSource": {
+                                  "reference": "${shop.items}",
+                                  "value": []
+                                },
+                                "itemAlias": "product"
+                              },
+                              "style": {
+                                "display": "flex",
+                                "flexDirection": "column",
+                                "gap": "12px"
+                              },
+                              "children": [
                         {
                           "id": "card-cart-item-{{itemIndex}}",
                           "type": "column",
@@ -555,10 +740,10 @@
                             "background": "#ffffff"
                           },
                           "style": {
-                            "borderRadius": "12px",
+                            "borderRadius": "24px",
                             "border": "1px solid #E5E5E5",
                             "opacity": {
-                              "reference": "${product.is_focused ? 1 : 0.5}",
+                              "reference": "${product.selected ? 1 : 0.5}",
                               "value": 1
                             }
                           },
@@ -638,20 +823,90 @@
                                           }
                                         },
                                         {
-                                          "id": "text-item-price-{{itemIndex}}",
-                                          "type": "text",
+                                          "id": "row-price-info-{{itemIndex}}",
+                                          "type": "row",
                                           "properties": {
-                                            "content": {
-                                              "reference": "${product.price} ₽",
-                                              "value": "0 ₽"
-                                            },
-                                            "variant": "body"
+                                            "spacing": 8,
+                                            "alignItems": "center"
                                           },
-                                          "style": {
-                                            "fontSize": "17px",
-                                            "fontWeight": 700,
-                                            "color": "#000000"
-                                          }
+                                          "children": [
+                                            {
+                                              "id": "text-item-price-{{itemIndex}}",
+                                              "type": "text",
+                                              "properties": {
+                                                "content": {
+                                                  "reference": "${product.price} ₽",
+                                                  "value": "0 ₽"
+                                                },
+                                                "variant": "body"
+                                              },
+                                              "style": {
+                                                "fontSize": "17px",
+                                                "fontWeight": 700,
+                                                "color": "#000000"
+                                              }
+                                            },
+                                            {
+                                              "id": "conditional-old-price-{{itemIndex}}",
+                                              "type": "conditional",
+                                              "properties": {
+                                                "condition": {
+                                                  "reference": "${product.original_price && product.original_price > product.price}",
+                                                  "value": false
+                                                }
+                                              },
+                                              "children": [
+                                                {
+                                                  "id": "text-item-old-price-{{itemIndex}}",
+                                                  "type": "text",
+                                                  "properties": {
+                                                    "content": {
+                                                      "reference": "${product.original_price} ₽",
+                                                      "value": "0 ₽"
+                                                    },
+                                                    "variant": "caption"
+                                                  },
+                                                  "style": {
+                                                    "fontSize": "13px",
+                                                    "fontWeight": 400,
+                                                    "color": "#8E8E93",
+                                                    "textDecoration": "line-through"
+                                                  }
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "id": "conditional-discount-badge-{{itemIndex}}",
+                                              "type": "conditional",
+                                              "properties": {
+                                                "condition": {
+                                                  "reference": "${product.discount_percent && product.discount_percent > 0}",
+                                                  "value": false
+                                                }
+                                              },
+                                              "children": [
+                                                {
+                                                  "id": "badge-discount-{{itemIndex}}",
+                                                  "type": "text",
+                                                  "properties": {
+                                                    "content": {
+                                                      "reference": "-${product.discount_percent}%",
+                                                      "value": "-5%"
+                                                    },
+                                                    "variant": "caption"
+                                                  },
+                                                  "style": {
+                                                    "fontSize": "11px",
+                                                    "fontWeight": 600,
+                                                    "color": "#FF3B30",
+                                                    "backgroundColor": "#FFEBE9",
+                                                    "padding": "2px 6px",
+                                                    "borderRadius": "4px"
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
                                         }
                                       ]
                                     }
@@ -674,7 +929,7 @@
                                         "event": "removeItem",
                                         "eventParams": {
                                           "selected_item_id": {
-                                            "reference": "${product.id}",
+                                            "reference": "${product.advertisement_id}",
                                             "value": 0
                                           }
                                         }
@@ -692,14 +947,14 @@
                                       "type": "button",
                                       "properties": {
                                         "text": {
-                                          "reference": "${product.is_focused ? '☑️' : '⬜'}",
+                                          "reference": "${product.selected ? '☑️' : '⬜'}",
                                           "value": "☑️"
                                         },
                                         "variant": "ghost",
                                         "event": "toggleFocus",
                                         "eventParams": {
                                           "selected_item_id": {
-                                            "reference": "${product.id}",
+                                            "reference": "${product.advertisement_id}",
                                             "value": 0
                                           }
                                         }
@@ -720,126 +975,183 @@
                               "id": "row-item-quantity-{{itemIndex}}",
                               "type": "row",
                               "properties": {
-                                "spacing": 8,
+                                "spacing": 12,
                                 "alignItems": "center",
-                                "justifyContent": "flex-end"
+                                "justifyContent": "space-between"
                               },
                               "children": [
                                 {
-                                  "id": "button-decrease-{{itemIndex}}",
+                                  "id": "button-buy-with-delivery-{{itemIndex}}",
                                   "type": "button",
                                   "properties": {
-                                    "text": "−",
-                                    "variant": "secondary",
-                                    "event": "decreaseQuantity",
+                                    "text": "Купить с доставкой",
+                                    "variant": "link",
+                                    "event": "buyWithDelivery",
                                     "eventParams": {
-                                      "selected_item_id": {
-                                        "reference": "${product.id}",
+                                      "product_id": {
+                                        "reference": "${product.advertisement_id}",
                                         "value": 0
                                       }
                                     }
                                   },
                                   "style": {
-                                    "width": "32px",
-                                    "height": "32px",
-                                    "padding": "0",
-                                    "borderRadius": "8px",
-                                    "backgroundColor": "#F0F0F0",
-                                    "fontSize": "18px",
-                                    "fontWeight": 600,
-                                    "color": "#000000",
-                                    "border": "1px solid #E5E5E5",
-                                    "cursor": "pointer"
+                                    "fontSize": "14px",
+                                    "fontWeight": 400,
+                                    "color": "#8B5CF6",
+                                    "background": "transparent",
+                                    "border": "none",
+                                    "cursor": "pointer",
+                                    "textDecoration": "none",
+                                    "padding": "0"
                                   }
                                 },
                                 {
-                                  "id": "text-quantity-{{itemIndex}}",
-                                  "type": "text",
+                                  "id": "row-quantity-controls-{{itemIndex}}",
+                                  "type": "row",
                                   "properties": {
-                                    "content": {
-                                      "reference": "${product.quantity || 1}",
-                                      "value": "1"
+                                    "spacing": 8,
+                                    "alignItems": "center"
+                                  },
+                                  "children": [
+                                    {
+                                      "id": "button-decrease-{{itemIndex}}",
+                                      "type": "button",
+                                      "properties": {
+                                        "text": "−",
+                                        "variant": "secondary",
+                                        "event": "decreaseQuantity",
+                                        "eventParams": {
+                                          "selected_item_id": {
+                                            "reference": "${product.advertisement_id}",
+                                            "value": 0
+                                          },
+                                          "quantity_change": {
+                                            "reference": "${product.quantity}",
+                                            "value": 1
+                                          }
+                                        },
+                                        "disabled": {
+                                          "reference": "${product.quantity <= 1}",
+                                          "value": false
+                                        }
+                                      },
+                                      "style": {
+                                        "width": "32px",
+                                        "height": "32px",
+                                        "padding": "0",
+                                        "borderRadius": "8px",
+                                        "backgroundColor": "#F0F0F0",
+                                        "fontSize": "18px",
+                                        "fontWeight": 600,
+                                        "color": "#000000",
+                                        "border": "1px solid #E5E5E5",
+                                        "cursor": "pointer"
+                                      }
                                     },
-                                    "variant": "body"
-                                  },
-                                  "style": {
-                                    "fontSize": "15px",
-                                    "fontWeight": 600,
-                                    "color": "#000000",
-                                    "minWidth": "24px",
-                                    "textAlign": "center"
-                                  }
-                                },
-                                {
-                                  "id": "button-increase-{{itemIndex}}",
-                                  "type": "button",
-                                  "properties": {
-                                    "text": "+",
-                                    "variant": "secondary",
-                                    "event": "increaseQuantity",
-                                    "eventParams": {
-                                      "selected_item_id": {
-                                        "reference": "${product.id}",
-                                        "value": 0
+                                    {
+                                      "id": "text-quantity-{{itemIndex}}",
+                                      "type": "text",
+                                      "properties": {
+                                        "content": {
+                                          "reference": "${product.quantity || 1}",
+                                          "value": "1"
+                                        },
+                                        "variant": "body"
+                                      },
+                                      "style": {
+                                        "fontSize": "15px",
+                                        "fontWeight": 600,
+                                        "color": "#000000",
+                                        "minWidth": "24px",
+                                        "textAlign": "center"
+                                      }
+                                    },
+                                    {
+                                      "id": "button-increase-{{itemIndex}}",
+                                      "type": "button",
+                                      "properties": {
+                                        "text": "+",
+                                        "variant": "secondary",
+                                        "event": "increaseQuantity",
+                                        "eventParams": {
+                                          "selected_item_id": {
+                                            "reference": "${product.advertisement_id}",
+                                            "value": 0
+                                          },
+                                          "quantity_change": {
+                                            "reference": "${product.quantity}",
+                                            "value": 1
+                                          }
+                                        }
+                                      },
+                                      "style": {
+                                        "width": "32px",
+                                        "height": "32px",
+                                        "padding": "0",
+                                        "borderRadius": "8px",
+                                        "backgroundColor": "#F0F0F0",
+                                        "fontSize": "18px",
+                                        "fontWeight": 600,
+                                        "color": "#000000",
+                                        "border": "1px solid #E5E5E5",
+                                        "cursor": "pointer"
                                       }
                                     }
-                                  },
-                                  "style": {
-                                    "width": "32px",
-                                    "height": "32px",
-                                    "padding": "0",
-                                    "borderRadius": "8px",
-                                    "backgroundColor": "#F0F0F0",
-                                    "fontSize": "18px",
-                                    "fontWeight": 600,
-                                    "color": "#000000",
-                                    "border": "1px solid #E5E5E5",
-                                    "cursor": "pointer"
-                                  }
+                                  ]
                                 }
                               ]
                             }
                           ]
                         }
                       ]
+                            }
+                          ]
+                        }
+                      ]
                     },
                     {
-                      "id": "divider-suggested",
-                      "type": "divider",
-                      "style": {
-                        "margin": "8px 0",
-                        "borderTop": "1px solid #E5E5E5"
-                      }
-                    },
-                    {
-                      "id": "text-suggested-title",
-                      "type": "text",
+                      "id": "column-suggested-section",
+                      "type": "column",
                       "properties": {
-                        "content": "Добавьте ещё 1 товар до скидки 5%",
-                        "variant": "body"
+                        "spacing": 12,
+                        "padding": 16,
+                        "background": "#F9F9F9"
                       },
                       "style": {
-                        "fontSize": "13px",
-                        "fontWeight": 600,
-                        "color": "#8E8E93"
-                      }
-                    },
-                    {
-                      "id": "list-suggested-products",
-                      "type": "list",
-                      "properties": {
-                        "dataSource": {
-                          "reference": "${suggested_products}",
-                          "value": []
-                        },
-                        "itemAlias": "suggested"
-                      },
-                      "style": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "12px"
+                        "borderRadius": "16px",
+                        "marginTop": "16px"
                       },
                       "children": [
+                        {
+                          "id": "text-suggested-title",
+                          "type": "text",
+                          "properties": {
+                            "content": "Добавьте ещё 1 товар до скидки 5%",
+                            "variant": "body"
+                          },
+                          "style": {
+                            "fontSize": "15px",
+                            "fontWeight": 600,
+                            "color": "#2F3034",
+                            "marginBottom": "8px"
+                          }
+                        },
+                        {
+                          "id": "list-suggested-products",
+                          "type": "list",
+                          "properties": {
+                            "dataSource": {
+                              "reference": "${suggested_products}",
+                              "value": []
+                            },
+                            "itemAlias": "suggested"
+                          },
+                          "style": {
+                            "display": "flex",
+                            "flexDirection": "column",
+                            "gap": "12px"
+                          },
+                          "children": [
                         {
                           "id": "card-suggested-{{itemIndex}}",
                           "type": "row",
@@ -896,20 +1208,59 @@
                                   }
                                 },
                                 {
-                                  "id": "text-suggested-price-{{itemIndex}}",
-                                  "type": "text",
+                                  "id": "row-suggested-price-{{itemIndex}}",
+                                  "type": "row",
                                   "properties": {
-                                    "content": {
-                                      "reference": "${suggested.price} ₽",
-                                      "value": "0 ₽"
-                                    },
-                                    "variant": "body"
+                                    "spacing": 6,
+                                    "alignItems": "center"
                                   },
-                                  "style": {
-                                    "fontSize": "15px",
-                                    "fontWeight": 700,
-                                    "color": "#000000"
-                                  }
+                                  "children": [
+                                    {
+                                      "id": "text-suggested-price-{{itemIndex}}",
+                                      "type": "text",
+                                      "properties": {
+                                        "content": {
+                                          "reference": "${suggested.price} ₽",
+                                          "value": "0 ₽"
+                                        },
+                                        "variant": "body"
+                                      },
+                                      "style": {
+                                        "fontSize": "15px",
+                                        "fontWeight": 700,
+                                        "color": "#000000"
+                                      }
+                                    },
+                                    {
+                                      "id": "conditional-suggested-old-price-{{itemIndex}}",
+                                      "type": "conditional",
+                                      "properties": {
+                                        "condition": {
+                                          "reference": "${suggested.original_price && suggested.original_price > suggested.price}",
+                                          "value": false
+                                        }
+                                      },
+                                      "children": [
+                                        {
+                                          "id": "text-suggested-old-price-{{itemIndex}}",
+                                          "type": "text",
+                                          "properties": {
+                                            "content": {
+                                              "reference": "${suggested.original_price} ₽",
+                                              "value": "0 ₽"
+                                            },
+                                            "variant": "caption"
+                                          },
+                                          "style": {
+                                            "fontSize": "12px",
+                                            "fontWeight": 400,
+                                            "color": "#8E8E93",
+                                            "textDecoration": "line-through"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
                                 }
                               ]
                             },
@@ -945,30 +1296,122 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "conditional-snackbar",
+              "type": "conditional",
+              "properties": {
+                "condition": {
+                  "reference": "${ui.notifications.message !== null}",
+                  "value": false
+                }
+              },
+              "children": [
+                {
+                  "id": "snackbar-notification",
+                  "type": "row",
+                  "properties": {
+                    "spacing": 12,
+                    "alignItems": "center",
+                    "justifyContent": "space-between",
+                    "padding": 16
+                  },
+                  "style": {
+                    "position": "fixed",
+                    "bottom": "90px",
+                    "left": "16px",
+                    "right": "16px",
+                    "backgroundColor": "#2F3034",
+                    "borderRadius": "12px",
+                    "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    "zIndex": 1000
+                  },
+                  "children": [
+                    {
+                      "id": "text-snackbar-message",
+                      "type": "text",
+                      "properties": {
+                        "content": {
+                          "reference": "${ui.notifications.message}",
+                          "value": "Уведомление"
+                        },
+                        "variant": "body"
+                      },
+                      "style": {
+                        "fontSize": "15px",
+                        "fontWeight": 400,
+                        "color": "#ffffff",
+                        "flex": 1
+                      }
+                    },
+                    {
+                      "id": "conditional-snackbar-action",
+                      "type": "conditional",
+                      "properties": {
+                        "condition": {
+                          "reference": "${ui.notifications.actionLabel !== null}",
+                          "value": false
+                        }
+                      },
+                      "children": [
+                        {
+                          "id": "button-snackbar-action",
+                          "type": "button",
+                          "properties": {
+                            "text": {
+                              "reference": "${ui.notifications.actionLabel}",
+                              "value": "Действие"
+                            },
+                            "variant": "link",
+                            "event": {
+                              "reference": "${ui.notifications.actionEvent}",
+                              "value": "snackbarAction"
+                            }
+                          },
+                          "style": {
+                            "fontSize": "15px",
+                            "fontWeight": 600,
+                            "color": "#8B5CF6",
+                            "background": "transparent",
+                            "border": "none",
+                            "cursor": "pointer",
+                            "padding": "0"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
-        },
-        "footer": {
+        }
+      ]
+    },
+    "footer": {
           "id": "section-cart-footer",
           "type": "Section",
           "properties": {
             "slot": "footer",
             "padding": 16,
-            "spacing": 12,
+            "spacing": 0,
             "background": "#ffffff"
           },
           "style": {
             "borderTop": "1px solid #E5E5E5",
-            "boxShadow": "0 -2px 8px rgba(0, 0, 0, 0.08)"
+            "boxShadow": "0 -4px 24px rgba(0, 0, 0, 0.12), 0 -1px 3px rgba(0, 0, 0, 0.05)"
           },
           "children": [
             {
-              "id": "row-total-info",
+              "id": "row-footer-content",
               "type": "row",
               "properties": {
-                "spacing": 0,
+                "spacing": 16,
                 "alignItems": "center",
                 "justifyContent": "space-between"
+              },
+              "style": {
+                "height": "52px"
               },
               "children": [
                 {
@@ -977,12 +1420,18 @@
                   "properties": {
                     "spacing": 4
                   },
+                  "style": {
+                    "flex": "1"
+                  },
                   "children": [
                     {
                       "id": "text-total-label",
                       "type": "text",
                       "properties": {
-                        "content": "Итого",
+                        "content": {
+                          "reference": "${cart_response.total_items_count} ${cart_response.total_items_count === 1 ? 'товар' : (cart_response.total_items_count >= 2 && cart_response.total_items_count <= 4 ? 'товара' : 'товаров')}",
+                          "value": "0 товаров"
+                        },
                         "variant": "body"
                       },
                       "style": {
@@ -996,13 +1445,13 @@
                       "type": "text",
                       "properties": {
                         "content": {
-                          "reference": "${cart_response.total_price || 0} ₽",
+                          "reference": "${cart_response.total_amount || 0} ₽",
                           "value": "0 ₽"
                         },
                         "variant": "heading"
                       },
                       "style": {
-                        "fontSize": "24px",
+                        "fontSize": "20px",
                         "fontWeight": 700,
                         "color": "#000000"
                       }
@@ -1010,46 +1459,31 @@
                   ]
                 },
                 {
-                  "id": "text-selected-count",
-                  "type": "text",
+                  "id": "button-checkout",
+                  "type": "button",
                   "properties": {
-                    "content": {
-                      "reference": "Выбрано: ${cart_response.selected_count || 0}",
-                      "value": "Выбрано: 0"
-                    },
-                    "variant": "caption"
+                    "text": "Оформить",
+                    "variant": "primary",
+                    "event": "checkout",
+                    "disabled": {
+                      "reference": "${cart_response.total_items_count === 0}",
+                      "value": true
+                    }
                   },
                   "style": {
-                    "fontSize": "13px",
-                    "fontWeight": 400,
-                    "color": "#8E8E93"
+                    "minWidth": "182px",
+                    "padding": "16px 24px",
+                    "borderRadius": "16px",
+                    "backgroundColor": "#8B5CF6",
+                    "fontSize": "16px",
+                    "fontWeight": 600,
+                    "color": "#ffffff",
+                    "border": "none",
+                    "cursor": "pointer",
+                    "transition": "background-color 0.2s"
                   }
                 }
               ]
-            },
-            {
-              "id": "button-checkout",
-              "type": "button",
-              "properties": {
-                "text": "Оформить доставку",
-                "variant": "primary",
-                "event": "checkout",
-                "disabled": {
-                  "reference": "${cart_response.advertisements.length === 0}",
-                  "value": true
-                }
-              },
-              "style": {
-                "width": "100%",
-                "padding": "16px",
-                "borderRadius": "12px",
-                "backgroundColor": "#0A74F0",
-                "fontSize": "16px",
-                "fontWeight": 600,
-                "color": "#ffffff",
-                "border": "none",
-                "cursor": "pointer"
-              }
             }
           ]
         }

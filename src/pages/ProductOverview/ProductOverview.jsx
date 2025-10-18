@@ -21,7 +21,7 @@ import { WorkflowExportButton } from '../../components/WorkflowExportButton/Work
 import toast from 'react-hot-toast';
 import './ProductOverview.css';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
-import { loadAvitoDemoAsGraphData, convertAvitoDemoScreensToArray } from '../../utils/avitoDemoConverter';
+import { loadAvitoDemoAsGraphData, loadAvitoDemoSubflowAsGraphData, convertAvitoDemoScreensToArray } from '../../utils/avitoDemoConverter';
 
 const ProductOverview = () => {
   const { productId } = useParams();
@@ -112,6 +112,37 @@ const ProductOverview = () => {
           console.error('Failed to load avitoDemo:', error);
           setIsLoadingData(false);
           toast.error('Ошибка загрузки avitoDemo: ' + error.message);
+        });
+    } else if (productId === 'avito-cart-demo-subflow') {
+      setIsLoadingData(true);
+      loadAvitoDemoSubflowAsGraphData()
+        .then((data) => {
+          setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
+          setVariableSchemas(data.variableSchemas);
+          
+          // Преобразуем screens в массив для ProductOverview
+          const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
+          setProductScreens(screensArray);
+          
+          const mockProduct = {
+            id: productId,
+            name: 'Авито — Корзина с Subflow',
+            version: '1.0.0',
+            description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): 13 экранов, 27 действий',
+            theme: 'light',
+            permissions: ['admin', 'viewer'],
+            integrations: ['avito-api'],
+            badge: '🔥 NEW'
+          };
+          setProduct(mockProduct);
+          setProductMeta(mockProduct);
+          setIsLoadingData(false);
+          toast.success('avitoDemoSubflow загружен успешно!');
+        })
+        .catch((error) => {
+          console.error('Failed to load avitoDemoSubflow:', error);
+          setIsLoadingData(false);
+          toast.error('Ошибка загрузки avitoDemoSubflow: ' + error.message);
         });
     } else {
       // Mock loading product data для обычных продуктов

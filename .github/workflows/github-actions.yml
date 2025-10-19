@@ -75,7 +75,7 @@ jobs:
             cd /opt/lct_efs/deployments
             
             echo "Pulling latest backend changes..."
-            git pull origin release/0.0.1
+            git pull origin main
             
             echo "Stopping existing containers..."
             docker-compose down

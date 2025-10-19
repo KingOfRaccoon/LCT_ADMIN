@@ -8,7 +8,6 @@ import {
   Activity,
   ChevronRight,
   FlaskConical,
-  PlayCircle,
   BarChart3,
   GitBranch
 } from 'lucide-react';
@@ -57,12 +56,6 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
           icon: BarChart3,
           path: '/analytics',
           active: currentPath === '/analytics'
-        },
-        {
-          label: 'Preview',
-          icon: PlayCircle,
-          path: '/preview?workflow_id=68dee410d2da09b7b691b749',
-          active: currentPath === '/preview'
         }
       ]
     }

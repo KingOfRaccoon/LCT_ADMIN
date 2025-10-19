@@ -35,9 +35,6 @@ function App() {
               {/* Analytics */}
               <Route path="/analytics" element={<AnalyticsDashboard />} />
 
-              {/* Preview */}
-              <Route path="/preview" element={<PreviewPage />} />
-
               {/* Subflows Management */}
               <Route path="/subflows" element={<SubflowsPage />} />
               

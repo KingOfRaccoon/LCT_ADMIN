@@ -3,99 +3,238 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
-  Filter, 
   Edit, 
   Trash2, 
   Copy,
-  MoreVertical,
   Grid,
   List as ListIcon
 } from 'lucide-react';
 import { useVirtualContext } from '../../context/VirtualContext';
 import toast from 'react-hot-toast';
+import {
+  listProducts,
+  createProduct as createProductApi,
+  deleteProduct as deleteProductApi,
+  getProductById as getProductByIdApi
+} from '../../services/productApi.js';
 import './ProductList.css';
+
+const DEFAULT_VERSION = '1.0.0';
+
+const DEMO_PRODUCTS = [
+  {
+    id: 'demo-ecommerce-dashboard',
+    name: 'E-commerce Dashboard',
+    description: 'Admin panel for managing products, orders, and customers',
+    status: 'active',
+    version: '2.1.0',
+    lastModified: '2024-01-15T10:30:00Z',
+    createdBy: 'aleksandrzvezdakov',
+    screens: 8,
+    actions: 15,
+    isRemote: false,
+    isDemo: true,
+    numericId: null,
+    workflowId: null,
+    metadata: {
+      createdAt: '2024-01-15T10:30:00Z',
+      updatedAt: '2024-01-15T10:30:00Z'
+    }
+  },
+  {
+    id: 'demo-user-registration',
+    name: 'User Registration Flow',
+    description: 'Multi-step registration process with validation',
+    status: 'draft',
+    version: '1.0.0',
+    lastModified: '2024-01-10T14:22:00Z',
+    createdBy: 'aleksandrzvezdakov',
+    screens: 4,
+    actions: 7,
+    isRemote: false,
+    isDemo: true,
+    numericId: null,
+    workflowId: null,
+    metadata: {
+      createdAt: '2024-01-10T14:22:00Z',
+      updatedAt: '2024-01-10T14:22:00Z'
+    }
+  },
+  {
+    id: 'demo-payment-gateway',
+    name: 'Payment Gateway Integration',
+    description: 'Complete payment processing workflow',
+    status: 'active',
+    version: '1.3.2',
+    lastModified: '2024-01-08T09:15:00Z',
+    createdBy: 'aleksandrzvezdakov',
+    screens: 6,
+    actions: 12,
+    isRemote: false,
+    isDemo: true,
+    numericId: null,
+    workflowId: null,
+    metadata: {
+      createdAt: '2024-01-08T09:15:00Z',
+      updatedAt: '2024-01-08T09:15:00Z'
+    }
+  },
+  {
+    id: 'avito-cart-demo',
+    name: 'Авито — Корзина',
+    description: 'Демонстрационный сценарий корзины Avito: добавление товаров, изменение количества, upsell-блоки и переход к оформлению',
+    status: 'active',
+    version: '1.0.0',
+    lastModified: '2024-01-01T12:00:00Z',
+    createdBy: 'aleksandrzvezdakov',
+    screens: 11,
+    actions: 25,
+    isRemote: false,
+    isDemo: true,
+    badge: '🔥 NEW',
+    numericId: null,
+    workflowId: 'avito-cart-demo',
+    metadata: {
+      createdAt: '2024-01-01T12:00:00Z',
+      updatedAt: '2024-01-01T12:00:00Z'
+    }
+  },
+  {
+    id: 'avito-cart-demo-subflow',
+    name: 'Авито — Корзина с Subflow',
+    description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): Input/Output mapping, dependent variables, изолированный контекст',
+    status: 'active',
+    version: '1.0.0',
+    lastModified: '2024-10-18T10:00:00Z',
+    createdBy: 'aleksandrzvezdakov',
+    screens: 13,
+    actions: 27,
+    badge: '🔥 NEW',
+    isRemote: false,
+    isDemo: true,
+    numericId: null,
+    workflowId: 'avito-cart-demo-subflow',
+    metadata: {
+      createdAt: '2024-10-18T10:00:00Z',
+      updatedAt: '2024-10-18T10:00:00Z'
+    }
+  }
+];
+
+function normalizeRemoteProduct(product) {
+  if (!product) {
+    return null;
+  }
+
+  const lastModified = product.metadata?.updatedAt ?? product.metadata?.createdAt ?? null;
+
+  return {
+    id: product.id,
+    numericId: product.numericId,
+    name: product.name,
+    description: product.description,
+    status: 'active',
+    version: DEFAULT_VERSION,
+    lastModified,
+    createdBy: 'remote',
+    screens: product.totalScreens ?? 0,
+    actions: product.totalComponents ?? 0,
+    workflowId: product.workflowId ?? null,
+    workflowSerialized: product.workflowSerialized ?? null,
+    metadata: product.metadata ?? {},
+    isRemote: true,
+    isDemo: false
+  };
+}
+
+function formatDate(dateString) {
+  if (!dateString) {
+    return '—';
+  }
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function getStatusBadge(product) {
+  const status = product.status ?? (product.isRemote ? 'active' : 'draft');
+  const label = status === 'active'
+    ? 'Active'
+    : status === 'draft'
+      ? 'Draft'
+      : status;
+
+  return (
+    <span className={`status-badge status-${status}`}>
+      {label}
+    </span>
+  );
+}
 
 const ProductList = () => {
   const navigate = useNavigate();
   const { setProduct } = useVirtualContext();
   
   // State management
-  const [products, setProducts] = useState([]);
+  const [remoteProducts, setRemoteProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [_selectedProducts, _setSelectedProducts] = useState([]);
 
-  // Mock data - In real app, this would come from API
+  // Load products from backend
   useEffect(() => {
-    const mockProducts = [
-      {
-        id: '1',
-        name: 'E-commerce Dashboard',
-        description: 'Admin panel for managing products, orders, and customers',
-        status: 'active',
-        version: '2.1.0',
-        lastModified: '2024-01-15T10:30:00Z',
-        createdBy: 'aleksandrzvezdakov',
-        screens: 8,
-        actions: 15
-      },
-      {
-        id: '2',
-        name: 'User Registration Flow',
-        description: 'Multi-step registration process with validation',
-        status: 'draft',
-        version: '1.0.0',
-        lastModified: '2024-01-10T14:22:00Z',
-        createdBy: 'aleksandrzvezdakov',
-        screens: 4,
-        actions: 7
-      },
-      {
-        id: '3',
-        name: 'Payment Gateway Integration',
-        description: 'Complete payment processing workflow',
-        status: 'active',
-        version: '1.3.2',
-        lastModified: '2024-01-08T09:15:00Z',
-        createdBy: 'aleksandrzvezdakov',
-        screens: 6,
-        actions: 12
-      },
-      {
-        id: 'avito-cart-demo',
-        name: 'Авито — Корзина',
-        description: 'Демонстрационный сценарий корзины Avito: добавление товаров, изменение количества, upsell-блоки и переход к оформлению',
-        status: 'active',
-        version: '1.0.0',
-        lastModified: '2024-01-01T12:00:00Z',
-        createdBy: 'aleksandrzvezdakov',
-        screens: 11,
-        actions: 25
-      },
-      {
-        id: 'avito-cart-demo-subflow',
-        name: 'Авито — Корзина с Subflow',
-        description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): Input/Output mapping, dependent variables, изолированный контекст',
-        status: 'active',
-        version: '1.0.0',
-        lastModified: '2024-10-18T10:00:00Z',
-        createdBy: 'aleksandrzvezdakov',
-        screens: 13,
-        actions: 27,
-        badge: '🔥 NEW'
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadProducts() {
+      try {
+        const backendProducts = await listProducts({ signal: controller.signal, parseWorkflow: false });
+        if (!isMounted) {
+          return;
+        }
+
+        const normalized = backendProducts
+          .map(normalizeRemoteProduct)
+          .filter(Boolean);
+
+        console.log('[ProductList] Loaded products from API:', normalized);
+        setRemoteProducts(normalized);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          return;
+        }
+        console.error('[ProductList] Failed to load products', error);
+        toast.error('Не удалось загрузить продукты с сервера');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    ];
-    
-    setTimeout(() => {
-      setProducts(mockProducts);
-      setLoading(false);
-    }, 500);
+    }
+
+    loadProducts();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   // Filter products based on search and status
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = remoteProducts.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
@@ -103,65 +242,108 @@ const ProductList = () => {
   });
 
   // Handle product actions
-  const handleCreateProduct = () => {
-    const newProduct = {
-      id: Date.now().toString(),
-      name: 'New Product',
-      description: 'Product description',
-      status: 'draft',
-      version: '1.0.0',
-      lastModified: new Date().toISOString(),
-      createdBy: 'aleksandrzvezdakov',
-      screens: 0,
-      actions: 0
-    };
-    
-    setProducts([newProduct, ...products]);
-    setProduct(newProduct);
-    navigate(`/products/${newProduct.id}`);
-    toast.success('New product created!');
-  };
+  const handleCreateProduct = async () => {
+    if (creating) {
+      return;
+    }
 
-  const handleEditProduct = (product) => {
-    setProduct(product);
-    navigate(`/products/${product.id}`);
-  };
+    setCreating(true);
+    try {
+      const timestamp = new Date().toISOString();
+      const productName = `Product ${timestamp.slice(0, 19).replace('T', ' ')}`;
+      const createdProduct = await createProductApi({
+        name: productName,
+        description: 'Draft product',
+        totalScreens: 0,
+        totalComponents: 0
+      });
 
-  const handleDuplicateProduct = (product) => {
-    const duplicatedProduct = {
-      ...product,
-      id: Date.now().toString(),
-      name: `${product.name} (Copy)`,
-      status: 'draft',
-      lastModified: new Date().toISOString()
-    };
-    
-    setProducts([duplicatedProduct, ...products]);
-    toast.success('Product duplicated successfully!');
-  };
+      const normalized = normalizeRemoteProduct(createdProduct);
+      if (normalized) {
+        setRemoteProducts((prev) => [normalized, ...prev]);
+      }
 
-  const handleDeleteProduct = (productId) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter(p => p.id !== productId));
-      toast.success('Product deleted successfully!');
+      setProduct(createdProduct);
+      navigate(`/products/${createdProduct.id}`);
+      toast.success('Product created successfully!');
+    } catch (error) {
+      console.error('[ProductList] Failed to create product', error);
+      toast.error('Не удалось создать продукт');
+    } finally {
+      setCreating(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const handleEditProduct = (product, { skipNavigate = false } = {}) => {
+    if (product.isRemote) {
+      setProduct(product);
+      getProductByIdApi(product.numericId ?? product.id, { parseWorkflow: true })
+        .then((fullProduct) => setProduct(fullProduct))
+        .catch((error) => {
+          console.warn('[ProductList] Failed to preload product details', error);
+        });
+    } else {
+      setProduct(product);
+    }
+
+    if (!skipNavigate) {
+      navigate(`/products/${product.id}`);
+    }
   };
 
-  const getStatusBadge = (status) => (
-    <span className={`status-badge status-${status}`}>
-      {status === 'active' ? 'Active' : 'Draft'}
-    </span>
-  );
+  const handleDuplicateProduct = async (product) => {
+    if (!product.isRemote) {
+      toast.error('Demo продукты нельзя клонировать через backend');
+      return;
+    }
+
+    try {
+      const sourceProduct = await getProductByIdApi(product.numericId ?? product.id, { parseWorkflow: true });
+      const duplicatedProduct = await createProductApi({
+        name: `${sourceProduct.name} (Copy)`,
+        description: sourceProduct.description,
+        totalScreens: sourceProduct.totalScreens,
+        totalComponents: sourceProduct.totalComponents,
+        workflow: sourceProduct.workflow ?? sourceProduct.workflowSerialized,
+        workflowId: sourceProduct.workflowId
+      });
+
+      const normalized = normalizeRemoteProduct(duplicatedProduct);
+      if (normalized) {
+        setRemoteProducts((prev) => [normalized, ...prev]);
+      }
+
+      toast.success('Product duplicated successfully!');
+    } catch (error) {
+      console.error('[ProductList] Failed to duplicate product', error);
+      toast.error('Не удалось дублировать продукт');
+    }
+  };
+
+  const handleDeleteProduct = async (product) => {
+    if (!product.isRemote) {
+      toast.error('Demo продукты нельзя удалять через backend');
+      return;
+    }
+
+    if (!product.numericId) {
+      toast.error('ID продукта отсутствует. Удаление невозможно.');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this product?')) {
+      return;
+    }
+
+    try {
+      await deleteProductApi(product.numericId);
+      setRemoteProducts((prev) => prev.filter((item) => item.numericId !== product.numericId));
+      toast.success('Product deleted successfully!');
+    } catch (error) {
+      console.error('[ProductList] Failed to delete product', error);
+      toast.error('Не удалось удалить продукт');
+    }
+  };
 
   if (loading) {
     return (
@@ -186,9 +368,10 @@ const ProductList = () => {
         <button 
           className="btn btn-primary"
           onClick={handleCreateProduct}
+          disabled={creating}
         >
           <Plus size={20} />
-          New Product
+          {creating ? 'Creating...' : 'New Product'}
         </button>
       </div>
 
@@ -261,7 +444,7 @@ const ProductList = () => {
                           <span className="product-badge">{product.badge}</span>
                         )}
                       </h3>
-                      {getStatusBadge(product.status)}
+                      {getStatusBadge(product)}
                     </div>
                     
                     <div className="card-actions">
@@ -279,7 +462,7 @@ const ProductList = () => {
                       </button>
                       <button
                         className="action-btn danger"
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => handleDeleteProduct(product)}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -312,7 +495,7 @@ const ProductList = () => {
                     <Link
                       to={`/products/${product.id}`}
                       className="btn btn-secondary btn-sm"
-                      onClick={() => setProduct(product)}
+                      onClick={() => handleEditProduct(product, { skipNavigate: true })}
                     >
                       Open
                     </Link>
@@ -342,13 +525,13 @@ const ProductList = () => {
                         <Link
                           to={`/products/${product.id}`}
                           className="product-name-link"
-                          onClick={() => setProduct(product)}
+                          onClick={() => handleEditProduct(product, { skipNavigate: true })}
                         >
                           {product.name}
                         </Link>
                       </td>
                       <td className="description-cell">{product.description}</td>
-                      <td>{getStatusBadge(product.status)}</td>
+                      <td>{getStatusBadge(product)}</td>
                       <td>v{product.version}</td>
                       <td>{product.screens}</td>
                       <td>{formatDate(product.lastModified)}</td>
@@ -368,7 +551,7 @@ const ProductList = () => {
                           </button>
                           <button
                             className="action-btn danger"
-                            onClick={() => handleDeleteProduct(product.id)}
+                            onClick={() => handleDeleteProduct(product)}
                           >
                             <Trash2 size={16} />
                           </button>

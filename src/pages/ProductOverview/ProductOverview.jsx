@@ -22,6 +22,57 @@ import toast from 'react-hot-toast';
 import './ProductOverview.css';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import { loadAvitoDemoAsGraphData, loadAvitoDemoSubflowAsGraphData, convertAvitoDemoScreensToArray } from '../../utils/avitoDemoConverter';
+import { getProductById as getProductByIdApi } from '../../services/productApi.js';
+
+const DEFAULT_REMOTE_VERSION = '1.0.0';
+
+function normalizeScreensFromWorkflow(workflow) {
+  if (!workflow) {
+    return [];
+  }
+
+  if (Array.isArray(workflow.screens)) {
+    return workflow.screens.map((screen, index) => ({
+      id: screen?.id ?? `screen-${index + 1}`,
+      name: screen?.name ?? `Screen ${index + 1}`,
+      type: screen?.type ?? 'screen',
+      description: screen?.description ?? '',
+      order: screen?.order ?? index + 1,
+      components: screen?.components ?? screen?.componentsCount ?? 0,
+      actions: screen?.actions ?? screen?.actionsCount ?? 0,
+      status: screen?.status ?? 'draft'
+    }));
+  }
+
+  if (workflow.screens && typeof workflow.screens === 'object') {
+    return Object.entries(workflow.screens).map(([id, screen], index) => ({
+      id,
+      name: screen?.name ?? id,
+      type: screen?.type ?? screen?.screenType ?? 'screen',
+      description: screen?.description ?? '',
+      order: screen?.order ?? index + 1,
+      components: screen?.components ?? screen?.componentsCount ?? 0,
+      actions: screen?.actions ?? screen?.actionsCount ?? 0,
+      status: screen?.status ?? 'draft'
+    }));
+  }
+
+  if (Array.isArray(workflow.nodes)) {
+    const screenNodes = workflow.nodes.filter((node) => String(node?.type || '').toLowerCase() === 'screen');
+    return screenNodes.map((node, index) => ({
+      id: node.id ?? `screen-${index + 1}`,
+      name: node.data?.name ?? node.label ?? `Screen ${index + 1}`,
+      type: node.type ?? 'screen',
+      description: node.data?.description ?? '',
+      order: node.data?.order ?? index + 1,
+      components: node.data?.components ?? node.data?.componentsCount ?? 0,
+      actions: node.data?.actions ?? node.data?.actionsCount ?? 0,
+      status: node.data?.status ?? 'draft'
+    }));
+  }
+
+  return [];
+}
 
 const ProductOverview = () => {
   const { productId } = useParams();
@@ -82,117 +133,189 @@ const ProductOverview = () => {
   }, [productScreens, setScreens]);
 
   useEffect(() => {
-    // Загружаем данные по productId (независимо от currentProduct)
-    if (productId === 'avito-cart-demo') {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const loadAvitoDemo = async () => {
       setIsLoadingData(true);
-      loadAvitoDemoAsGraphData()
-        .then((data) => {
-          setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
-          setVariableSchemas(data.variableSchemas);
-          
-          // Преобразуем screens в массив для ProductOverview
-          const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
-          setProductScreens(screensArray);
-          
-          const mockProduct = {
-            id: productId,
-            name: 'Авито — Корзина',
-            version: '1.0.0',
-            description: 'Демонстрационный сценарий корзины Avito с 11 экранами и 25 действиями',
-            theme: 'light',
-            permissions: ['admin', 'viewer'],
-            integrations: ['avito-api']
-          };
-          setProduct(mockProduct);
-          setProductMeta(mockProduct);
-          setIsLoadingData(false);
-          toast.success('avitoDemo загружен успешно!');
-        })
-        .catch((error) => {
-          console.error('Failed to load avitoDemo:', error);
-          setIsLoadingData(false);
-          toast.error('Ошибка загрузки avitoDemo: ' + error.message);
-        });
-    } else if (productId === 'avito-cart-demo-subflow') {
-      setIsLoadingData(true);
-      loadAvitoDemoSubflowAsGraphData()
-        .then((data) => {
-          setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
-          setVariableSchemas(data.variableSchemas);
-          
-          // Преобразуем screens в массив для ProductOverview
-          const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
-          setProductScreens(screensArray);
-          
-          const mockProduct = {
-            id: productId,
-            name: 'Авито — Корзина с Subflow',
-            version: '1.0.0',
-            description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): 13 экранов, 27 действий',
-            theme: 'light',
-            permissions: ['admin', 'viewer'],
-            integrations: ['avito-api'],
-            badge: '🔥 NEW'
-          };
-          setProduct(mockProduct);
-          setProductMeta(mockProduct);
-          setIsLoadingData(false);
-          toast.success('avitoDemoSubflow загружен успешно!');
-        })
-        .catch((error) => {
-          console.error('Failed to load avitoDemoSubflow:', error);
-          setIsLoadingData(false);
-          toast.error('Ошибка загрузки avitoDemoSubflow: ' + error.message);
-        });
-    } else {
-      // Mock loading product data для обычных продуктов
-      const mockProduct = {
-        id: productId,
-        name: 'E-commerce Dashboard',
-        version: '2.1.0',
-        description: 'Admin panel for managing products, orders, and customers',
-        theme: 'light',
-        permissions: ['admin', 'editor'],
-        integrations: ['stripe', 'analytics']
-      };
-      setProduct(mockProduct);
-      setProductMeta(mockProduct);
-      
-      // Загружаем mock экраны для обычных продуктов
-      const mockScreens = [
-        {
-          id: 'start',
-          name: 'Login Screen',
-          type: 'form',
-          description: 'User authentication form with email and password',
-          order: 1,
-          components: 3,
-          actions: 2,
-          status: 'complete'
-        },
-        {
-          id: 'dashboard',
-          name: 'Dashboard',
-          type: 'display',
-          description: 'Main dashboard with analytics and navigation',
-          order: 2,
-          components: 8,
-          actions: 5,
-          status: 'draft'
-        },
-        {
-          id: 'error-screen',
-          name: 'Error Screen',
-          type: 'system',
-          description: 'Displays authentication errors and retry options',
-          order: 3,
-          components: 4,
-          actions: 1,
-          status: 'draft'
+      try {
+        const data = await loadAvitoDemoAsGraphData();
+        if (!isMounted) {
+          return;
         }
-      ];
-      setProductScreens(mockScreens);
+
+        setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
+        setVariableSchemas(data.variableSchemas);
+        const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
+        setProductScreens(screensArray);
+
+        const mockProduct = {
+          id: productId,
+          name: 'Авито — Корзина',
+          version: '1.0.0',
+          description: 'Демонстрационный сценарий корзины Avito с 11 экранами и 25 действиями',
+          theme: 'light',
+          permissions: ['admin', 'viewer'],
+          integrations: ['avito-api']
+        };
+
+        setProduct(mockProduct);
+        setProductMeta(mockProduct);
+        toast.success('avitoDemo загружен успешно!');
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Failed to load avitoDemo:', error);
+        toast.error('Ошибка загрузки avitoDemo: ' + error.message);
+      } finally {
+        if (isMounted) {
+          setIsLoadingData(false);
+        }
+      }
+    };
+
+    const loadAvitoDemoSubflow = async () => {
+      setIsLoadingData(true);
+      try {
+        const data = await loadAvitoDemoSubflowAsGraphData();
+        if (!isMounted) {
+          return;
+        }
+
+        setGraphData({ nodes: data.nodes, edges: data.edges, screens: data.screens });
+        setVariableSchemas(data.variableSchemas);
+        const screensArray = convertAvitoDemoScreensToArray(data.screens, data.nodes);
+        setProductScreens(screensArray);
+
+        const mockProduct = {
+          id: productId,
+          name: 'Авито — Корзина с Subflow',
+          version: '1.0.0',
+          description: 'Профессиональный сценарий корзины с переиспользуемым онбордингом (Subflow): 13 экранов, 27 действий',
+          theme: 'light',
+          permissions: ['admin', 'viewer'],
+          integrations: ['avito-api'],
+          badge: '🔥 NEW'
+        };
+
+        setProduct(mockProduct);
+        setProductMeta(mockProduct);
+        toast.success('avitoDemoSubflow загружен успешно!');
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        console.error('Failed to load avitoDemoSubflow:', error);
+        toast.error('Ошибка загрузки avitoDemoSubflow: ' + error.message);
+      } finally {
+        if (isMounted) {
+          setIsLoadingData(false);
+        }
+      }
+    };
+
+    const loadRemoteProduct = async () => {
+      setIsLoadingData(true);
+      try {
+        const product = await getProductByIdApi(productId, { signal: controller.signal, parseWorkflow: true });
+        if (!isMounted) {
+          return;
+        }
+
+        if (!product) {
+          toast.error('Продукт не найден');
+          setProductScreens([]);
+          setGraphData({ nodes: [], edges: [], screens: {} });
+          setVariableSchemas({});
+          setProductMeta((prev) => ({
+            ...prev,
+            name: '',
+            version: DEFAULT_REMOTE_VERSION,
+            description: ''
+          }));
+          return;
+        }
+
+        setProduct(product);
+        setProductMeta((prev) => ({
+          ...prev,
+          name: product.name ?? '',
+          version: product.workflow?.version ?? DEFAULT_REMOTE_VERSION,
+          description: product.description ?? ''
+        }));
+
+        setVariableSchemas(product.variableSchemas ?? {});
+
+        const rawNodes = Array.isArray(product.workflow?.nodes) ? product.workflow.nodes : [];
+        const edges = Array.isArray(product.workflow?.edges) ? product.workflow.edges : [];
+        const screensMap = product.workflow?.screens ?? {};
+
+        // Normalize nodes to ensure they have position field
+        const nodes = rawNodes.map((node, index) => ({
+          ...node,
+          position: node.position && typeof node.position === 'object' && 
+                    Number.isFinite(node.position.x) && Number.isFinite(node.position.y)
+            ? node.position
+            : { x: 100 + (index % 5) * 200, y: 100 + Math.floor(index / 5) * 150 }
+        }));
+
+        // Preserve all workflow metadata
+        const fullWorkflow = {
+          ...product.workflow,
+          nodes,
+          edges,
+          screens: screensMap,
+          // Ensure essential fields exist
+          id: product.workflow?.id || product.workflow?.workflow_id || product.workflowId,
+          workflow_id: product.workflow?.workflow_id || product.workflow?.id || product.workflowId,
+          name: product.workflow?.name || product.name || 'Workflow',
+          version: product.workflow?.version || '1.0.0',
+          variableSchemas: product.workflow?.variableSchemas || {},
+          initialContext: product.workflow?.initialContext || {}
+        };
+
+        console.log('[ProductOverview] Setting graphData with metadata:', {
+          id: fullWorkflow.id,
+          workflow_id: fullWorkflow.workflow_id,
+          name: fullWorkflow.name,
+          version: fullWorkflow.version,
+          nodesCount: fullWorkflow.nodes.length,
+          edgesCount: fullWorkflow.edges.length,
+          screensCount: Object.keys(fullWorkflow.screens).length
+        });
+
+        setGraphData(fullWorkflow);
+        const screensArray = normalizeScreensFromWorkflow(product.workflow);
+        setProductScreens(screensArray);
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          return;
+        }
+        if (!isMounted) {
+          return;
+        }
+        console.error('Failed to load product:', error);
+        toast.error('Ошибка загрузки продукта');
+      } finally {
+        if (isMounted) {
+          setIsLoadingData(false);
+        }
+      }
+    };
+
+    if (productId === 'avito-cart-demo') {
+      loadAvitoDemo();
+    } else if (productId === 'avito-cart-demo-subflow') {
+      loadAvitoDemoSubflow();
+    } else {
+      loadRemoteProduct();
     }
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [productId, setProduct, setGraphData, setVariableSchemas]);
 
   const handleSaveMetadata = () => {

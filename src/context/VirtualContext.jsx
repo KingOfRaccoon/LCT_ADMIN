@@ -72,10 +72,17 @@ const initialState = {
   currentScreen: null,
   // All screens in current product
   screens: [],
-  // Graph data for current screen (nodes and edges)
+  // Graph data for current screen (nodes and edges + workflow metadata)
   graphData: {
     nodes: [],
-    edges: []
+    edges: [],
+    screens: {},
+    variableSchemas: {},
+    initialContext: {},
+    id: null,
+    workflow_id: null,
+    name: null,
+    version: null
   },
   variableSchemas: {}
 };
@@ -320,12 +327,11 @@ function virtualContextReducer(state, action) {
       const nodeId = incomingNode.id || uuidv4();
       const existingIndex = state.graphData.nodes.findIndex((node) => node.id === nodeId);
       const normalizedNode = {
+        ...incomingNode,
         id: nodeId,
         type: incomingNode.type || 'default',
         data: incomingNode.data || {},
-        position: incomingNode.position || { x: 0, y: 0 },
-        ...incomingNode,
-        id: nodeId
+        position: incomingNode.position || { x: 0, y: 0 }
       };
 
       if (existingIndex !== -1) {

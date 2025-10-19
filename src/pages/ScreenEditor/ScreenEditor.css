@@ -22,6 +22,48 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+}
+
+.editor-header .header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.editor-tabs {
+  display: flex;
+  gap: 4px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.editor-tabs .tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.editor-tabs .tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+  color: #1e293b;
+}
+
+.editor-tabs .tab.active {
+  background: white;
+  color: #3b82f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .breadcrumb {
@@ -51,6 +93,8 @@
 .header-actions {
   display: flex;
   gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 /* Buttons */
@@ -147,10 +191,15 @@
   background: white;
   border: 2px solid #e2e8f0;
   border-radius: 8px;
-  min-width: 180px;
+  min-width: 300px;
+  min-height: 200px;
+  width: auto;
+  max-width: 420px;
   font-family: inherit;
   transition: all 0.2s;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  position: relative;
 }
 
 .screen-node:hover,
@@ -250,13 +299,21 @@
 
 .node-content {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+  min-height: 150px;
 }
 
 .node-label {
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 14px;
   color: #1e293b;
   margin-bottom: 8px;
   cursor: pointer;
+  line-height: 1.4;
+  min-height: 20px;
 }
 
 .node-description {
@@ -780,6 +837,28 @@
   padding: 16px 0;
 }
 
+/* Workflow Data Container */
+.workflow-data-container {
+  flex: 1;
+  overflow-y: auto;
+  background: #f5f5f7;
+  padding: 0;
+}
+
+.workflow-data-container .workflow-viewer {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  min-height: 100%;
+}
+
+.workflow-data-container .workflow-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .properties-panel {
@@ -813,5 +892,259 @@
     height: 300px;
     border-left: none;
     border-top: 1px solid #e2e8f0;
+  }
+}
+/* Node Data Preview Styles */
+.node-data-preview {
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.node-data-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  transition: all 0.2s;
+}
+
+.node-data-header:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.node-data-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.node-data-content {
+  margin-top: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1e293b;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.node-data-content pre {
+  margin: 0;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.node-data-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.node-data-content::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
+}
+
+.node-data-content::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.node-data-content::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Node Bindings */
+.node-bindings {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  display: block;
+  visibility: visible;
+}
+
+.node-bindings-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.node-bindings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.node-bindings-list li {
+  font-size: 12px;
+  color: #1e293b;
+  padding: 4px 8px;
+  background: white;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.node-bindings-empty {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Node Meta */
+.node-meta {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fef3c7;
+  border-radius: 4px;
+  border: 1px solid #fbbf24;
+  display: block;
+  visibility: visible;
+}
+
+.node-meta-row {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.node-meta-row:last-child {
+  margin-bottom: 0;
+}
+
+.node-meta-label {
+  font-weight: 600;
+  color: #92400e;
+  flex-shrink: 0;
+}
+
+.node-meta-value {
+  color: #78350f;
+  word-break: break-word;
+}
+
+/* Config Summary */
+.node-config-summary {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #0ea5e9;
+}
+
+.node-config-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0369a1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.node-config-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.node-config-method {
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: #0ea5e9;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.node-config-endpoint {
+  font-size: 11px;
+  color: #0c4a6e;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
+  flex: 1;
+}
+
+.node-config-meta {
+  font-size: 11px;
+  color: #075985;
+  margin-bottom: 3px;
+  padding-left: 4px;
+}
+
+.node-config-meta:last-child {
+  margin-bottom: 0;
+}
+
+.node-config-expression {
+  font-size: 11px;
+  color: #0c4a6e;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  background: white;
+  padding: 6px 8px;
+  border-radius: 3px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* Edge Labels */
+.edge-label-card {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.edge-label-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+  z-index: 1000;
+}
+
+.edge-label-card:active {
+  transform: scale(0.98);
+}
+
+/* Edge animations */
+.react-flow__edge-path {
+  transition: stroke 0.2s ease, stroke-width 0.2s ease;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }

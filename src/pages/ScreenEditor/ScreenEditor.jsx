@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -60,8 +60,148 @@ import './ScreenEditor.css';
 import ConfirmDialog from '../../components/Common/ConfirmDialog';
 import { useVirtualContext } from '../../context/VirtualContext';
 import { useWorkflowApi } from '../../hooks/useWorkflowApi';
+import { getProductById as getProductByIdApi } from '../../services/productApi.js';
 import dagre from 'dagre';
 import defaultGraphTemplate from '../../data/defaultGraphTemplate.json';
+import WorkflowViewer from '../../components/WorkflowViewer';
+
+const normalizeBindings = (bindings) => (Array.isArray(bindings) ? bindings : []);
+
+const formatBindingLabel = (binding) => {
+  if (!binding) {
+    return '—';
+  }
+
+  const name = typeof binding.name === 'string' ? binding.name.trim() : '';
+  const variable = typeof binding.variable === 'string' ? binding.variable.trim() : '';
+
+  if (name && variable) {
+    if (name === variable) {
+      return name;
+    }
+    return `${name} → ${variable}`;
+  }
+
+  if (variable) {
+    return variable;
+  }
+
+  if (name) {
+    return name;
+  }
+
+  return '—';
+};
+
+const BindingsSection = ({ title, bindings, emptyMessage }) => (
+  <div className="node-bindings">
+    <div className="node-bindings-title">{title}</div>
+    {bindings.length > 0 ? (
+      <ul className="node-bindings-list">
+        {bindings.map((binding) => (
+          <li key={binding.id || `${binding.name || 'binding'}-${binding.variable || 'value'}`}>
+            {formatBindingLabel(binding)}
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <div className="node-bindings-empty">{emptyMessage}</div>
+    )}
+  </div>
+);
+
+const truncateText = (value, maxLength = 120) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1)}…`;
+};
+
+const describeSchema = (schema) => {
+  if (!schema || typeof schema !== 'object') {
+    return null;
+  }
+
+  if (Array.isArray(schema)) {
+    return `Массив (${schema.length})`;
+  }
+
+  const keys = Object.keys(schema);
+  if (keys.length === 0) {
+    return 'Объект (пустой)';
+  }
+
+  const keysPreview = keys.slice(0, 5).join(', ');
+  return keys.length > 5 ? `${keysPreview} и др.` : keysPreview;
+};
+
+const ConfigSummary = ({ actionType, config = {} }) => {
+  if (!actionType) {
+    return null;
+  }
+
+  if (actionType === 'api') {
+    const method = (config.method || 'GET').toUpperCase();
+    const endpoint = config.endpoint ? truncateText(config.endpoint.trim(), 140) : '—';
+    const contextKey = typeof config.contextKey === 'string' ? config.contextKey.trim() : '';
+    const schemaMeta = describeSchema(config.schema);
+
+    return (
+      <div className="node-config-summary">
+        <div className="node-config-title">Конфигурация API</div>
+        <div className="node-config-line">
+          <span className="node-config-method">{method}</span>
+          <span className="node-config-endpoint">{endpoint}</span>
+        </div>
+        {contextKey && (
+          <div className="node-config-meta">Контекст: {contextKey}</div>
+        )}
+        {schemaMeta && (
+          <div className="node-config-meta">Схема: {schemaMeta}</div>
+        )}
+      </div>
+    );
+  }
+
+  if (actionType === 'condition') {
+    const condition = config.condition ? truncateText(config.condition, 140) : '—';
+    return (
+      <div className="node-config-summary">
+        <div className="node-config-title">Условие</div>
+        <div className="node-config-expression">{condition}</div>
+      </div>
+    );
+  }
+
+  if (actionType === 'validation') {
+    const field = config.field ? config.field.trim() : '—';
+    const validationType = config.validationType ? config.validationType : 'required';
+    return (
+      <div className="node-config-summary">
+        <div className="node-config-title">Проверка</div>
+        <div className="node-config-meta">Поле: {field}</div>
+        <div className="node-config-meta">Тип: {validationType}</div>
+      </div>
+    );
+  }
+
+  const configKeys = Object.keys(config || {});
+  if (configKeys.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="node-config-summary">
+      <div className="node-config-title">Параметры</div>
+      <div className="node-config-expression">{truncateText(JSON.stringify(config), 140)}</div>
+    </div>
+  );
+};
 
 const sanitizeGraphState = (nodes = [], edges = []) => {
   const schemas = {};
@@ -138,12 +278,17 @@ const sanitizeGraphState = (nodes = [], edges = []) => {
   };
 };
 
-const hydrateGraphNodes = (nodes = [], handlers = {}) => {
+const hydrateGraphNodes = (nodes = [], handlers = {}, fullGraphData = null) => {
   const { onLabelChange, onConfigChange, onExecute } = handlers;
   return nodes.map((node) => {
     const data = node.data ? { ...node.data } : {};
 
     if (data) {
+      // Нормализация label: используем name если label не задан
+      if (!data.label && data.name) {
+        data.label = data.name;
+      }
+      
       if (typeof onLabelChange === 'function') {
         data.onLabelChange = onLabelChange;
       }
@@ -155,11 +300,68 @@ const hydrateGraphNodes = (nodes = [], handlers = {}) => {
       }
       data.inputBindings = Array.isArray(data.inputBindings) ? data.inputBindings : [];
       data.outputBindings = Array.isArray(data.outputBindings) ? data.outputBindings : [];
+      
+      // Добавляем полные данные узла для отображения
+      if (fullGraphData) {
+        data.nodeData = {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: { ...data },
+          // Удаляем функции из отображаемых данных
+          ...(fullGraphData.initialContext && { initialContext: fullGraphData.initialContext }),
+          ...(fullGraphData.variableSchemas && { variableSchemas: fullGraphData.variableSchemas })
+        };
+        
+        // Очищаем функции из nodeData
+        if (data.nodeData.data) {
+          delete data.nodeData.data.onLabelChange;
+          delete data.nodeData.data.onConfigChange;
+          delete data.nodeData.data.onExecute;
+        }
+      }
     }
 
     return {
       ...node,
       data
+    };
+  });
+};
+
+const hydrateGraphEdges = (edges = []) => {
+  return edges.map((edge) => {
+    const data = edge.data ? { ...edge.data } : {};
+    
+    // Нормализация: используем name если label не задан
+    const label = edge.label || data.name || data.trigger || 'Переход';
+    
+    // Устанавливаем тип edge
+    const type = edge.type || 'custom';
+    
+    // Нормализация markerEnd
+    let markerEnd = edge.markerEnd;
+    if (markerEnd && typeof markerEnd.type === 'string') {
+      const markerKey = markerEnd.type;
+      markerEnd = {
+        ...markerEnd,
+        type: MarkerType[markerKey] || MarkerType.ArrowClosed
+      };
+    } else if (!markerEnd) {
+      markerEnd = { type: MarkerType.ArrowClosed };
+    }
+
+    return {
+      ...edge,
+      type,
+      label,
+      markerEnd,
+      data: {
+        ...data,
+        name: data.name || label,
+        trigger: data.trigger || data.event || 'auto',
+        type: data.type || 'default'
+      }
     };
   });
 };
@@ -198,7 +400,7 @@ const buildDefaultGraph = (handleNodeLabelChange, handleNodeConfigChange, handle
 };
 
 // Custom Edge with Label
-const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, style }) => {
+const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, style, data, source, target }) => {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -208,26 +410,142 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
     targetPosition,
   });
 
+  // Извлекаем информацию о переходе
+  const transitionName = data?.name || label;
+  const trigger = data?.trigger || data?.event || 'auto';
+  const condition = data?.condition;
+  const description = data?.description;
+  const transitionType = data?.type || 'default';
+  
+  // Определяем стиль в зависимости от типа перехода
+  const getEdgeStyle = () => {
+    switch (transitionType) {
+      case 'success':
+        return { borderColor: '#10b981', backgroundColor: '#d1fae5', textColor: '#065f46' };
+      case 'error':
+        return { borderColor: '#ef4444', backgroundColor: '#fee2e2', textColor: '#991b1b' };
+      case 'conditional':
+        return { borderColor: '#f59e0b', backgroundColor: '#fef3c7', textColor: '#92400e' };
+      case 'default':
+      default:
+        return { borderColor: '#3b82f6', backgroundColor: '#dbeafe', textColor: '#1e40af' };
+    }
+  };
+
+  const edgeStyle = getEdgeStyle();
+  const hasCondition = condition && typeof condition === 'string' && condition.trim();
+  const hasDescription = description && typeof description === 'string' && description.trim();
+  const displayLabel = transitionName || trigger;
+
   return (
     <>
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+      <BaseEdge 
+        id={id} 
+        path={edgePath} 
+        markerEnd={markerEnd} 
+        style={{ 
+          ...style, 
+          stroke: edgeStyle.borderColor, 
+          strokeWidth: 2 
+        }} 
+      />
       <EdgeLabelRenderer>
         <div
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             background: 'white',
-            padding: '4px 8px',
-            borderRadius: '4px',
+            padding: '8px 12px',
+            borderRadius: '8px',
             fontSize: 12,
             fontWeight: 500,
-            border: '1px solid #e2e8f0',
-            color: '#64748b',
+            border: `2px solid ${edgeStyle.borderColor}`,
+            color: '#1e293b',
             pointerEvents: 'all',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            maxWidth: '280px',
+            minWidth: '120px',
           }}
-          className="nodrag nopan"
+          className="nodrag nopan edge-label-card"
         >
-          {label}
+          {/* Название перехода */}
+          <div style={{ 
+            fontWeight: 700, 
+            color: edgeStyle.textColor, 
+            marginBottom: (hasCondition || hasDescription || trigger !== 'auto') ? '6px' : 0,
+            fontSize: 13,
+            letterSpacing: '0.3px'
+          }}>
+            {displayLabel}
+          </div>
+
+          {/* Триггер/событие */}
+          {trigger && trigger !== 'auto' && trigger !== displayLabel && (
+            <div style={{ 
+              fontSize: 10, 
+              color: '#64748b',
+              marginBottom: (hasCondition || hasDescription) ? '4px' : 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span style={{ 
+                background: edgeStyle.backgroundColor, 
+                padding: '2px 6px', 
+                borderRadius: '4px',
+                fontWeight: 600,
+                color: edgeStyle.textColor
+              }}>
+                {trigger}
+              </span>
+            </div>
+          )}
+
+          {/* Описание */}
+          {hasDescription && (
+            <div style={{ 
+              fontSize: 11, 
+              color: '#475569',
+              marginBottom: hasCondition ? '4px' : 0,
+              lineHeight: 1.4
+            }}>
+              {description.length > 60 ? `${description.slice(0, 60)}...` : description}
+            </div>
+          )}
+
+          {/* Условие */}
+          {hasCondition && (
+            <div style={{ 
+              fontSize: 10, 
+              color: '#64748b',
+              fontFamily: 'Menlo, Monaco, monospace',
+              background: '#f1f5f9',
+              padding: '4px 6px',
+              borderRadius: '4px',
+              marginTop: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ color: '#94a3b8', fontWeight: 600 }}>if:</span> {condition.length > 50 ? `${condition.slice(0, 50)}...` : condition}
+            </div>
+          )}
+
+          {/* Индикатор типа */}
+          {transitionType !== 'default' && (
+            <div style={{
+              position: 'absolute',
+              top: '-8px',
+              right: '-8px',
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              background: edgeStyle.borderColor,
+              border: '2px solid white',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            }} />
+          )}
         </div>
       </EdgeLabelRenderer>
     </>
@@ -238,15 +556,40 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
 const ScreenNode = ({ data, id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
+  const [showData, setShowData] = useState(false);
   const statusLabel = data.status ? data.status.replace(/-/g, ' ') : null;
+  const inputBindings = normalizeBindings(data.inputBindings);
+  const outputBindings = normalizeBindings(data.outputBindings);
+  const screenId = typeof data.screenId === 'string' && data.screenId.trim() ? data.screenId.trim() : id;
+
+  console.log('[ScreenNode] Rendering:', { id, label: data.label, data, inputBindings, outputBindings });
 
   const handleSave = () => {
     data.onLabelChange(id, label);
     setIsEditing(false);
   };
 
+  const renderDataPreview = () => {
+    if (!data.nodeData) return null;
+    
+    return (
+      <div className="node-data-preview">
+        <div className="node-data-header" onClick={() => setShowData(!showData)}>
+          <Database size={12} />
+          <span>Данные</span>
+          <span className="node-data-toggle">{showData ? '▼' : '▶'}</span>
+        </div>
+        {showData && (
+          <div className="node-data-content">
+            <pre>{JSON.stringify(data.nodeData, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="screen-node">
+    <div className="screen-node" style={{ minWidth: 300, minHeight: 200 }}>
       <div className="node-header">
         <Monitor size={16} />
         <span className="node-type">Screen</span>
@@ -256,7 +599,7 @@ const ScreenNode = ({ data, id }) => {
           </span>
         )}
       </div>
-      <div className="node-content">
+      <div className="node-content" style={{ minHeight: 150 }}>
         {isEditing ? (
           <div className="node-edit">
             <input
@@ -270,14 +613,23 @@ const ScreenNode = ({ data, id }) => {
           </div>
         ) : (
           <div className="node-label" onDoubleClick={() => setIsEditing(true)}>
-            {data.label}
+            {data.label || 'Unnamed Screen'}
           </div>
         )}
-        {data.description && (
-          <div className="node-description">
-            {data.description}
+        <div className="node-meta">
+          <div className="node-meta-row">
+            <span className="node-meta-label">ID:</span>
+            <span className="node-meta-value">{screenId}</span>
           </div>
-        )}
+          {data.description && (
+            <div className="node-meta-row">
+              <span className="node-meta-label">Описание:</span>
+              <span className="node-meta-value">{data.description}</span>
+            </div>
+          )}
+        </div>
+        <BindingsSection title="Входные параметры" bindings={inputBindings} emptyMessage="Нет входных параметров" />
+        <BindingsSection title="Выходные параметры" bindings={outputBindings} emptyMessage="Нет выходных параметров" />
         {(typeof data.components === 'number' || typeof data.actions === 'number') && (
           <div className="node-metrics">
             {typeof data.components === 'number' && (
@@ -288,6 +640,7 @@ const ScreenNode = ({ data, id }) => {
             )}
           </div>
         )}
+        {renderDataPreview()}
       </div>
       <div className="node-handles">
         <Handle type="target" position={Position.Left} className="handle handle-input" />
@@ -299,10 +652,14 @@ const ScreenNode = ({ data, id }) => {
 
 const ActionNode = ({ data, id }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showData, setShowData] = useState(false);
   const [schemaText, setSchemaText] = useState(
     data.config?.schema ? JSON.stringify(data.config.schema, null, 2) : ''
   );
   const [schemaError, setSchemaError] = useState(null);
+  const inputBindings = normalizeBindings(data.inputBindings);
+  const outputBindings = normalizeBindings(data.outputBindings);
+  const stateId = typeof data.stateId === 'string' && data.stateId.trim() ? data.stateId.trim() : id;
 
   useEffect(() => {
     setSchemaText(data.config?.schema ? JSON.stringify(data.config.schema, null, 2) : '');
@@ -332,8 +689,27 @@ const ActionNode = ({ data, id }) => {
 
   const ActionIcon = getActionIcon(data.actionType);
 
+  const renderDataPreview = () => {
+    if (!data.nodeData) return null;
+    
+    return (
+      <div className="node-data-preview">
+        <div className="node-data-header" onClick={() => setShowData(!showData)}>
+          <Database size={12} />
+          <span>Данные узла</span>
+          <span className="node-data-toggle">{showData ? '▼' : '▶'}</span>
+        </div>
+        {showData && (
+          <div className="node-data-content">
+            <pre>{JSON.stringify(data.nodeData, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className={`action-node ${data.actionType}`}>
+    <div className={`action-node ${data.actionType}`} style={{ minWidth: 320, minHeight: 220 }}>
       <div className="node-header">
         <ActionIcon size={16} />
         <span className="node-type">{data.actionType}</span>
@@ -344,8 +720,24 @@ const ActionNode = ({ data, id }) => {
           {isExpanded ? '−' : '+'}
         </button>
       </div>
-      <div className="node-content">
-        <div className="node-label">{data.label}</div>
+      <div className="node-content" style={{ minHeight: 170 }}>
+        <div className="node-label">{data.label || 'Unnamed Action'}</div>
+        <div className="node-meta">
+          <div className="node-meta-row">
+            <span className="node-meta-label">ID:</span>
+            <span className="node-meta-value">{stateId}</span>
+          </div>
+          {data.description && (
+            <div className="node-meta-row">
+              <span className="node-meta-label">Описание:</span>
+              <span className="node-meta-value">{data.description}</span>
+            </div>
+          )}
+        </div>
+        <ConfigSummary actionType={data.actionType} config={config} />
+        {renderDataPreview()}
+        <BindingsSection title="Входные параметры" bindings={inputBindings} emptyMessage="Нет входных параметров" />
+        <BindingsSection title="Выходные параметры" bindings={outputBindings} emptyMessage="Нет выходных параметров" />
         {isExpanded && (
           <div className="node-config">
             {data.actionType === 'api' && (
@@ -475,6 +867,129 @@ const ActionNode = ({ data, id }) => {
   );
 };
 
+// Integration Node (для API вызовов, внешних интеграций)
+const IntegrationNode = ({ data, id }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const inputBindings = normalizeBindings(data.inputBindings);
+  const outputBindings = normalizeBindings(data.outputBindings);
+  const stateId = typeof data.stateId === 'string' && data.stateId.trim() ? data.stateId.trim() : id;
+
+  return (
+    <div className="action-node api" style={{ minWidth: 320, minHeight: 220 }}>
+      <div className="node-header">
+        <Activity size={16} />
+        <span className="node-type">Integration</span>
+        <button 
+          className="expand-btn"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? '−' : '+'}
+        </button>
+      </div>
+      <div className="node-content" style={{ minHeight: 170 }}>
+        <div className="node-label">{data.label || data.name || 'Unnamed Integration'}</div>
+        <div className="node-meta">
+          <div className="node-meta-row">
+            <span className="node-meta-label">ID:</span>
+            <span className="node-meta-value">{stateId}</span>
+          </div>
+          {data.description && (
+            <div className="node-meta-row">
+              <span className="node-meta-label">Описание:</span>
+              <span className="node-meta-value">{data.description}</span>
+            </div>
+          )}
+        </div>
+        <ConfigSummary actionType="api" config={data.config || {}} />
+        <BindingsSection title="Входные параметры" bindings={inputBindings} emptyMessage="Нет входных параметров" />
+        <BindingsSection title="Выходные параметры" bindings={outputBindings} emptyMessage="Нет выходных параметров" />
+      </div>
+      <div className="node-handles">
+        <Handle type="target" position={Position.Left} className="handle handle-input" />
+        <Handle type="source" position={Position.Right} className="handle handle-output" />
+      </div>
+    </div>
+  );
+};
+
+// Technical Node (для технических операций, трансформаций данных)
+const TechnicalNode = ({ data, id }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const inputBindings = normalizeBindings(data.inputBindings);
+  const outputBindings = normalizeBindings(data.outputBindings);
+  const stateId = typeof data.stateId === 'string' && data.stateId.trim() ? data.stateId.trim() : id;
+
+  return (
+    <div className="action-node condition" style={{ minWidth: 320, minHeight: 220 }}>
+      <div className="node-header">
+        <Activity size={16} />
+        <span className="node-type">Technical</span>
+        <button 
+          className="expand-btn"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? '−' : '+'}
+        </button>
+      </div>
+      <div className="node-content" style={{ minHeight: 170 }}>
+        <div className="node-label">{data.label || data.name || 'Unnamed Technical'}</div>
+        <div className="node-meta">
+          <div className="node-meta-row">
+            <span className="node-meta-label">ID:</span>
+            <span className="node-meta-value">{stateId}</span>
+          </div>
+          {data.description && (
+            <div className="node-meta-row">
+              <span className="node-meta-label">Описание:</span>
+              <span className="node-meta-value">{data.description}</span>
+            </div>
+          )}
+        </div>
+        <BindingsSection title="Входные параметры" bindings={inputBindings} emptyMessage="Нет входных параметров" />
+        <BindingsSection title="Выходные параметры" bindings={outputBindings} emptyMessage="Нет выходных параметров" />
+      </div>
+      <div className="node-handles">
+        <Handle type="target" position={Position.Left} className="handle handle-input" />
+        <Handle type="source" position={Position.Right} className="handle handle-output" />
+      </div>
+    </div>
+  );
+};
+
+// Final Node (для конечных состояний)
+const FinalNode = ({ data, id }) => {
+  const inputBindings = normalizeBindings(data.inputBindings);
+  const stateId = typeof data.stateId === 'string' && data.stateId.trim() ? data.stateId.trim() : id;
+
+  return (
+    <div className="action-node validation" style={{ minWidth: 280, minHeight: 180 }}>
+      <div className="node-header">
+        <CheckCircle size={16} />
+        <span className="node-type">Final</span>
+      </div>
+      <div className="node-content" style={{ minHeight: 130 }}>
+        <div className="node-label">{data.label || data.name || 'Final State'}</div>
+        <div className="node-meta">
+          <div className="node-meta-row">
+            <span className="node-meta-label">ID:</span>
+            <span className="node-meta-value">{stateId}</span>
+          </div>
+          {data.description && (
+            <div className="node-meta-row">
+              <span className="node-meta-label">Описание:</span>
+              <span className="node-meta-value">{data.description}</span>
+            </div>
+          )}
+        </div>
+        <BindingsSection title="Входные параметры" bindings={inputBindings} emptyMessage="Нет входных параметров" />
+      </div>
+      <div className="node-handles">
+        <Handle type="target" position={Position.Left} className="handle handle-input" />
+      </div>
+    </div>
+  );
+};
+
 const VariableCard = ({ name, variable }) => (
   <>
     <span className="variable-name">{name}</span>
@@ -552,9 +1067,12 @@ const BindingVariableDropZone = ({ nodeId, bindingType, bindingId, children, dom
 };
 
 const NODE_DIMENSIONS = {
-  screen: { width: 240, height: 160 },
-  action: { width: 280, height: 220 },
-  default: { width: 240, height: 160 }
+  screen: { width: 320, height: 400 },
+  action: { width: 340, height: 450 },
+  integration: { width: 340, height: 400 },
+  technical: { width: 320, height: 380 },
+  final: { width: 300, height: 300 },
+  default: { width: 320, height: 400 }
 };
 
 const getNodeDimensions = (node) => NODE_DIMENSIONS[node.type] || NODE_DIMENSIONS.default;
@@ -667,9 +1185,14 @@ const getLayoutedElements = (nodes = [], edges = []) => {
 
 // Node Types Configuration
 const nodeTypes = {
-  screen: ScreenNode,
-  action: ActionNode,
+  screen: memo(ScreenNode),
+  action: memo(ActionNode),
+  integration: memo(IntegrationNode),
+  technical: memo(TechnicalNode),
+  final: memo(FinalNode),
 };
+
+console.log('[NodeTypes] Registered:', Object.keys(nodeTypes));
 
 // Edge Types Configuration  
 const edgeTypes = {
@@ -702,13 +1225,119 @@ const ScreenEditor = () => {
     deleteScreen,
     currentScreen,
     setCurrentScreen,
-    updateApiEndpointForNode
+    updateApiEndpointForNode,
+    setProduct
   } = useVirtualContext();
 
   const variablesRef = useRef(variables);
   useEffect(() => {
     variablesRef.current = variables;
   }, [variables]);
+
+  // Флаг для отслеживания состояния загрузки продукта
+  const [isProductLoading, setIsProductLoading] = useState(false);
+  const productLoadAttemptedRef = useRef(false);
+
+  // Auto-load product on mount/reload if context is empty
+  useEffect(() => {
+    // Skip demo products
+    if (!productId || productId === 'avito-cart-demo' || productId === 'avito-cart-demo-subflow') {
+      productLoadAttemptedRef.current = true;
+      return;
+    }
+
+    // Skip if data already loaded
+    if (graphData?.nodes?.length > 0) {
+      productLoadAttemptedRef.current = true;
+      return;
+    }
+
+    // Skip if already attempted to load
+    if (productLoadAttemptedRef.current) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const loadProduct = async () => {
+      try {
+        setIsProductLoading(true);
+        console.log(`[ScreenEditor] Auto-loading product ${productId} due to empty context`);
+        const product = await getProductByIdApi(productId, {
+          signal: controller.signal,
+          parseWorkflow: true
+        });
+
+        if (!isMounted) return;
+
+        // Set product in context
+        setProduct(product);
+
+        if (product?.workflow) {
+          const workflow = product.workflow;
+
+          // Normalize nodes to ensure valid position field (fixes React Flow crash)
+          const normalizedNodes = (workflow.nodes || []).map((node, index) => ({
+            ...node,
+            position: node.position && typeof node.position.x === 'number' && typeof node.position.y === 'number'
+              ? node.position
+              : {
+                  x: 100 + (index % 5) * 200,
+                  y: 100 + Math.floor(index / 5) * 150
+                }
+          }));
+
+          // Preserve all workflow metadata
+          const normalizedWorkflow = {
+            ...workflow,
+            nodes: normalizedNodes,
+            // Ensure essential fields exist
+            id: workflow.id || workflow.workflow_id || product.workflowId,
+            workflow_id: workflow.workflow_id || workflow.id || product.workflowId,
+            name: workflow.name || product.name || 'Workflow',
+            version: workflow.version || '1.0.0',
+            edges: workflow.edges || [],
+            screens: workflow.screens || {},
+            initialContext: workflow.initialContext || {}
+          };
+
+          console.log('[ScreenEditor] Setting graphData with metadata:', {
+            id: normalizedWorkflow.id,
+            workflow_id: normalizedWorkflow.workflow_id,
+            name: normalizedWorkflow.name,
+            version: normalizedWorkflow.version,
+            nodesCount: normalizedWorkflow.nodes.length,
+            edgesCount: normalizedWorkflow.edges.length,
+            screensCount: Object.keys(normalizedWorkflow.screens).length
+          });
+
+          setGraphData(normalizedWorkflow);
+
+          if (workflow.variableSchemas) {
+            setVariableSchemas(workflow.variableSchemas);
+          }
+        }
+        
+        productLoadAttemptedRef.current = true;
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        console.error('[ScreenEditor] Failed to auto-load product:', error);
+        productLoadAttemptedRef.current = true;
+      } finally {
+        if (isMounted) {
+          setIsProductLoading(false);
+        }
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [productId, graphData?.nodes?.length, setGraphData, setVariableSchemas, setProduct]);
 
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -720,6 +1349,7 @@ const ScreenEditor = () => {
   const [activeSuggestion, setActiveSuggestion] = useState(null);
   const [activeVariableId, setActiveVariableId] = useState(null);
   const [nodePendingDeletion, setNodePendingDeletion] = useState(null);
+  const [activeTab, setActiveTab] = useState('editor'); // 'editor' или 'data'
 
   const bindingDropZoneRefs = useRef(new Map());
   const suggestionHideTimeoutRef = useRef(null);
@@ -1562,6 +2192,20 @@ const ScreenEditor = () => {
       return;
     }
 
+    // Ждём завершения загрузки продукта
+    if (isProductLoading) {
+      console.log('[ScreenEditor] Waiting for product loading to complete...');
+      return;
+    }
+
+    // Если есть productId (не демо), дожидаемся попытки загрузки продукта
+    if (productId && productId !== 'avito-cart-demo' && productId !== 'avito-cart-demo-subflow') {
+      if (!productLoadAttemptedRef.current) {
+        console.log('[ScreenEditor] Waiting for product load attempt...');
+        return;
+      }
+    }
+
     let cancelled = false;
 
     const loadGraphFromJson = async () => {
@@ -1577,12 +2221,14 @@ const ScreenEditor = () => {
             onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
             onConfigChange: configChangeRef.current ?? handleNodeConfigChange,
             onExecute: handleNodeExecute
-          });
+          }, graphData);
+          
+          const hydratedEdges = hydrateGraphEdges(storedEdges);
 
           if (!cancelled) {
             setNodes(hydratedNodes);
-            setEdges(storedEdges);
-            setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
+            setEdges(hydratedEdges);
+            setHistory([{ nodes: hydratedNodes, edges: hydratedEdges }]);
             setHistoryIndex(0);
             graphInitializedRef.current = true;
             toast.success('Граф загружен из продукта');
@@ -1600,12 +2246,14 @@ const ScreenEditor = () => {
           onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
           onConfigChange: configChangeRef.current ?? handleNodeConfigChange,
           onExecute: handleNodeExecute
-        });
+        }, graphJson);
+        
+        const hydratedEdges = hydrateGraphEdges(storedEdges);
 
         if (!cancelled) {
           setNodes(hydratedNodes);
-          setEdges(storedEdges);
-          setHistory([{ nodes: hydratedNodes, edges: storedEdges }]);
+          setEdges(hydratedEdges);
+          setHistory([{ nodes: hydratedNodes, edges: hydratedEdges }]);
           setHistoryIndex(0);
           graphInitializedRef.current = true;
           if (graphJson.variableSchemas && typeof graphJson.variableSchemas === 'object') {
@@ -1631,11 +2279,12 @@ const ScreenEditor = () => {
     return () => {
       cancelled = true;
     };
-  }, [screenId]);
+  }, [screenId, graphData, isProductLoading, productId]);
 
   // Сбрасываем флаг при смене screenId
   useEffect(() => {
     graphInitializedRef.current = false;
+    productLoadAttemptedRef.current = false;
   }, [screenId]);
 
   const addNewNode = useCallback((nodeType) => {
@@ -1929,12 +2578,25 @@ const ScreenEditor = () => {
         variableSchemas: schemas,
         variables: variablesList,
         variableDefinitions,
-        screenName: currentScreen?.name || 'New Screen'
+        screenName: currentScreen?.name || 'New Screen',
+        // Preserve workflow metadata
+        id: graphData?.id || graphData?.workflow_id,
+        workflow_id: graphData?.workflow_id || graphData?.id,
+        name: graphData?.name || 'Workflow',
+        version: graphData?.version || '1.0.0',
+        screens: graphData?.screens || {},
+        initialContext: graphData?.initialContext || {}
       };
 
       localStorage.setItem(`flow-${screenId}`, JSON.stringify(payload));
 
-      setGraphData({ nodes: sanitizedNodes, edges: sanitizedEdges });
+      // Preserve all metadata when updating graphData
+      setGraphData({
+        ...graphData,
+        nodes: sanitizedNodes,
+        edges: sanitizedEdges,
+        variableSchemas: schemas
+      });
       setVariableSchemas(schemas);
 
       // 2. Заново заполнить переменные на основе API-узлов и их outputBindings
@@ -2004,6 +2666,25 @@ const ScreenEditor = () => {
           <h1>{currentScreen?.name || 'Screen'} - Flow Editor</h1>
         </div>
 
+        <div className="header-center">
+          <div className="editor-tabs">
+            <button 
+              className={`tab ${activeTab === 'editor' ? 'active' : ''}`}
+              onClick={() => setActiveTab('editor')}
+            >
+              <GitBranch size={16} />
+              Редактор
+            </button>
+            <button 
+              className={`tab ${activeTab === 'data' ? 'active' : ''}`}
+              onClick={() => setActiveTab('data')}
+            >
+              <Database size={16} />
+              Данные
+            </button>
+          </div>
+        </div>
+
         <div className="header-actions">
           <button className="btn btn-ghost" onClick={undo} disabled={historyIndex <= 0}>
             <Undo size={18} />
@@ -2036,7 +2717,10 @@ const ScreenEditor = () => {
 
       {/* Main Editor */}
       <div className="editor-content">
+        {activeTab === 'editor' ? (
+        <>
         <div className="flow-container" ref={reactFlowWrapper}>
+          {console.log('[ReactFlow Debug] Rendering with nodes:', nodes.map(n => ({ id: n.id, type: n.type, label: n.data?.label })))}
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -2564,6 +3248,24 @@ const ScreenEditor = () => {
             </div>
           </div>
         </div>
+        </>
+        ) : (
+          <div className="workflow-data-container">
+            <WorkflowViewer data={{
+              id: graphData?.id || graphData?.workflow_id,
+              name: graphData?.name || 'Workflow',
+              description: graphData?.description || '',
+              total_screens: Object.keys(graphData?.screens || {}).length,
+              total_components: nodes.length,
+              workflow: {
+                ...graphData,
+                nodes,
+                edges
+              }
+            }} />
+          </div>
+        )}
+      </div>
       </div>
       <DragOverlay>
         {activeVariableId ? (
@@ -2583,7 +3285,6 @@ const ScreenEditor = () => {
         onConfirm={handleConfirmDeleteNode}
         onCancel={handleCancelDeleteNode}
       />
-      </div>
     </DndContext>
   );
 };

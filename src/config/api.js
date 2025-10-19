@@ -51,6 +51,10 @@ export const API_ENDPOINTS = {
   WORKFLOWS_LIST: '/api/workflows',
   WORKFLOW_SAVE: '/api/workflows',
   
+  // Product API (admin backservices)
+  PRODUCTS: '/backservices/api/products',
+  PRODUCTS_BY_WORKFLOW: '/backservices/api/products/workflow',
+
   // Sandbox API (legacy)
   SANDBOX_START: '/api/start',
   SANDBOX_ACTION: '/api/action',

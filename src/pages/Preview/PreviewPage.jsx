@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SandboxScreenRenderer from '../Sandbox/SandboxScreenRenderer';
 import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
-import { loadWorkflow, parseWorkflowUrlParams } from '../../utils/workflowApi';
+import { loadWorkflow } from '../../utils/workflowApi';
 import { useClientWorkflow } from '../../hooks/useClientWorkflow';
 import { Activity, RotateCcw, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';

@@ -12,6 +12,7 @@ import {
   ButtonComponent,
   TextComponent,
   ImageComponent,
+  IconComponent,
   InputComponent,
   ColumnComponent,
   RowComponent,
@@ -399,13 +400,14 @@ const SandboxScreenRenderer = ({
       }
 
       case 'card': {
-        // Кликабельная карточка с поддержкой событий
+        // Кликабельная карточка с поддержкой событий и локального контекста
         return (
           <CardComponent
             component={component}
             context={context}
             iterationStack={iterationStack}
             onEvent={onEvent}
+            onInputChange={onInputChange}
             isEventPending={isEventPending}
             trackClick={trackClick}
             activeScreenId={activeScreenId}
@@ -489,6 +491,17 @@ const SandboxScreenRenderer = ({
         // ✅ ФАЗА 2.4: Используем мемоизированный ImageComponent
         return (
           <ImageComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+          />
+        );
+      }
+
+      case 'icon': {
+        // ✅ ФАЗА 2.4: Используем мемоизированный IconComponent
+        return (
+          <IconComponent
             component={component}
             context={context}
             iterationStack={iterationStack}

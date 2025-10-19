@@ -4,9 +4,12 @@
 
 import { getBaseUrl, getApiUrl, API_ENDPOINTS, logApiRequest, logApiResponse, logApiError } from '../config/api';
 import { getClientSessionId } from './clientSession.js';
+import { startClientWorkflow } from '../services/clientWorkflowApi.js';
 
 /**
  * Получить workflow по client_session_id и client_workflow_id
+ * УСТАРЕЛО: Используйте startClientWorkflow из clientWorkflowApi.js
+ * Эта функция оставлена для обратной совместимости и просто делегирует вызов
  * 
  * @param {string} clientSessionId - ID сессии клиента
  * @param {string} clientWorkflowId - ID workflow клиента
@@ -17,69 +20,15 @@ import { getClientSessionId } from './clientSession.js';
  * console.log(workflow.nodes, workflow.edges, workflow.initialContext);
  */
 export async function fetchWorkflowById(clientSessionId, clientWorkflowId) {
-  console.log('[fetchWorkflowById] Called with:', { clientSessionId, clientWorkflowId });
+  console.log('[fetchWorkflowById] DEPRECATED: Используйте startClientWorkflow вместо этой функции');
+  console.log('[fetchWorkflowById] Delegating to startClientWorkflow:', { clientSessionId, clientWorkflowId });
   
   if (!clientSessionId || !clientWorkflowId) {
     throw new Error('clientSessionId и clientWorkflowId обязательны');
   }
 
-  const url = getApiUrl(API_ENDPOINTS.WORKFLOW);
-  const startTime = Date.now();
-  
-  const requestBody = {
-    client_session_id: clientSessionId,
-    client_workflow_id: clientWorkflowId,
-  };
-  
-  console.log('[fetchWorkflowById] Request body:', requestBody);
-  
-  logApiRequest('POST', url, requestBody);
-  
-  try {
-    const bodyString = JSON.stringify(requestBody);
-    console.log('[fetchWorkflowById] Sending body (stringified):', bodyString);
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: bodyString,
-    });
-
-    const duration = Date.now() - startTime;
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logApiError('POST', url, new Error(`Status ${response.status}`), duration);
-      throw new Error(`API ответил статусом ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    logApiResponse('POST', url, response, duration);
-    
-    // Валидация структуры ответа
-    if (!data || typeof data !== 'object') {
-      throw new Error('API вернул некорректные данные');
-    }
-
-    return data;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      const networkError = new Error(`Не удалось подключиться к API: ${url}. Проверьте, что сервер запущен.`);
-      logApiError('POST', url, networkError, duration);
-      throw networkError;
-    }
-    
-    if (!error.message.includes('[API]')) {
-      logApiError('POST', url, error, duration);
-    }
-    
-    throw error;
-  }
+  // Делегируем вызов к единому API
+  return startClientWorkflow(clientWorkflowId, {}, true);
 }
 
 /**

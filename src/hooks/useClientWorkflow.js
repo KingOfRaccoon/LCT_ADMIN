@@ -5,13 +5,14 @@
  * Управляет состоянием workflow, загрузкой и ошибками.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   startClientWorkflow,
   sendClientAction,
   getCurrentWorkflowState,
   resetClientWorkflow,
-  checkClientWorkflowHealth
+  checkClientWorkflowHealth,
+  clearWorkflowCache
 } from '../services/clientWorkflowApi.js';
 import { getClientSessionId } from '../utils/clientSession.js';
 
@@ -44,6 +45,10 @@ export function useClientWorkflow() {
     isApiAvailable: false
   });
 
+  // Ref для защиты от повторных вызовов startWorkflow
+  const isStartingRef = useRef(false);
+  const startedWorkflowIdRef = useRef(null);
+
   // Проверка доступности API при монтировании
   useEffect(() => {
     checkClientWorkflowHealth().then(isAvailable => {
@@ -74,10 +79,20 @@ export function useClientWorkflow() {
 
   /**
    * Запускает новый workflow
-   * ⚠️ Защита от параллельных вызовов через isLoading
+   * ⚠️ Защита от параллельных вызовов через isLoading и ref
    */
   const startWorkflow = useCallback(async (workflowId, initialContext = {}) => {
-    // ✅ Защита от двойного вызова: если уже идёт загрузка, игнорируем
+    // ✅ Проверяем через ref - если уже стартуем этот же workflow, игнорируем
+    if (isStartingRef.current || startedWorkflowIdRef.current === workflowId) {
+      console.warn('⚠️ [useClientWorkflow] startWorkflow ignored: already starting or started', {
+        isStarting: isStartingRef.current,
+        startedWorkflowId: startedWorkflowIdRef.current,
+        requestedWorkflowId: workflowId
+      });
+      return;
+    }
+    
+    // ✅ Дополнительная проверка через state
     setWorkflowState(prev => {
       if (prev.isLoading) {
         console.warn('⚠️ [useClientWorkflow] startWorkflow ignored: already loading');
@@ -85,6 +100,9 @@ export function useClientWorkflow() {
       }
       return { ...prev, isLoading: true, error: null };
     });
+    
+    isStartingRef.current = true;
+    startedWorkflowIdRef.current = workflowId;
     
     try {
       const response = await startClientWorkflow(workflowId, initialContext);
@@ -96,7 +114,12 @@ export function useClientWorkflow() {
         isLoading: false,
         error
       }));
+      // Сбрасываем ref при ошибке, чтобы можно было повторить
+      isStartingRef.current = false;
+      startedWorkflowIdRef.current = null;
       throw error;
+    } finally {
+      isStartingRef.current = false;
     }
   }, [updateFromResponse]);
 
@@ -145,6 +168,16 @@ export function useClientWorkflow() {
    */
   const reset = useCallback(async () => {
     setWorkflowState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    // Сбрасываем ref
+    isStartingRef.current = false;
+    const currentWorkflowId = startedWorkflowIdRef.current;
+    startedWorkflowIdRef.current = null;
+    
+    // Очищаем кэш для этого workflow
+    if (currentWorkflowId) {
+      clearWorkflowCache(currentWorkflowId);
+    }
     
     try {
       const response = await resetClientWorkflow();

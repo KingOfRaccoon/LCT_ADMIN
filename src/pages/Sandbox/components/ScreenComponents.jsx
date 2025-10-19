@@ -149,6 +149,49 @@ export const ImageComponent = React.memo(({ component, context, iterationStack =
 ImageComponent.displayName = 'ImageComponent';
 
 // ============================================================================
+// Icon Component
+// ============================================================================
+
+export const IconComponent = React.memo(({ component, context, iterationStack = [] }) => {
+  const props = component?.props ?? component?.properties ?? {};
+  const name = resolveBindingValue(props?.name, context, 'help', { iterationStack });
+  const size = resolveBindingValue(props?.size, context, 24, { iterationStack });
+  const color = resolveBindingValue(props?.color, context, '#000000', { iterationStack });
+  
+  // Стили для иконки
+  const iconStyle = {
+    fontSize: typeof size === 'number' ? `${size}px` : size,
+    color: color,
+    width: typeof size === 'number' ? `${size}px` : size,
+    height: typeof size === 'number' ? `${size}px` : size,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...component.style
+  };
+  
+  return (
+    <span 
+      className="material-icons canvas-icon" 
+      style={iconStyle}
+      aria-hidden="true"
+    >
+      {name}
+    </span>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.component.id === nextProps.component.id &&
+    prevProps.component.style === nextProps.component.style &&
+    JSON.stringify(prevProps.component.props) === JSON.stringify(nextProps.component.props) &&
+    prevProps.context === nextProps.context &&
+    prevProps.iterationStack === nextProps.iterationStack
+  );
+});
+
+IconComponent.displayName = 'IconComponent';
+
+// ============================================================================
 // Input Component
 // ============================================================================
 
@@ -386,12 +429,17 @@ export const CardComponent = React.memo(({
   trackClick,
   activeScreenId,
   activeScreenName,
+  onInputChange,
   children
 }) => {
   const props = component?.props ?? component?.properties ?? {};
   
   const eventName = typeof props?.event === 'string' ? props.event.trim() : '';
   const rawEventParams = props?.eventParams || {};
+  
+  // Поддержка inputName и inputValue для локального управления состоянием
+  const inputName = props?.inputName;
+  const inputValue = props?.inputValue;
   
   // Резолвим eventParams с учётом iterationStack
   const eventParams = useMemo(() => {
@@ -412,24 +460,41 @@ export const CardComponent = React.memo(({
       eventName: eventName || null
     });
     
-    if (eventName && typeof onEvent === 'function') {
+    console.log('[CardComponent] Click:', {
+      inputName,
+      inputValue,
+      hasOnInputChange: typeof onInputChange === 'function',
+      eventName,
+      componentId: component.id
+    });
+    
+    // Если есть inputName и inputValue, обновляем локальный контекст
+    if (inputName && inputValue && typeof onInputChange === 'function') {
+      console.log('[CardComponent] Calling onInputChange:', inputName, '=', inputValue);
+      onInputChange(inputName, inputValue);
+    }
+    // Иначе используем события
+    else if (eventName && typeof onEvent === 'function') {
+      console.log('[CardComponent] Calling onEvent:', eventName, eventParams);
       onEvent(eventName, eventParams);
     }
-  }, [component.id, component.type, eventName, JSON.stringify(eventParams), onEvent, trackClick, activeScreenId, activeScreenName]);
+  }, [component.id, component.type, eventName, JSON.stringify(eventParams), onEvent, trackClick, activeScreenId, activeScreenName, inputName, inputValue, onInputChange]);
   
   const isDisabled = isEventPending && eventName;
+  const isClickable = eventName || (inputName && inputValue);
   
   return (
     <div
       className="canvas-card"
       style={{
         ...component.style,
-        cursor: eventName ? 'pointer' : component.style?.cursor,
+        cursor: isClickable ? 'pointer' : component.style?.cursor,
         pointerEvents: isDisabled ? 'none' : 'auto',
         opacity: isDisabled ? 0.6 : component.style?.opacity
       }}
-      onClick={eventName ? handleClick : undefined}
+      onClick={isClickable ? handleClick : undefined}
       data-event={eventName || undefined}
+      data-input-name={inputName || undefined}
     >
       {children}
     </div>

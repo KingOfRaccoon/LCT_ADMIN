@@ -69,36 +69,63 @@ const ClientWorkflowRunner = ({ workflowId, initialContext = {}, onExit }) => {
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toISOString());
   const isStartingRef = useRef(false);
   const startedWorkflowIdRef = useRef(null);
+  const hasMountedRef = useRef(false); // Отслеживаем первое монтирование
 
-  // Автостарт workflow при монтировании (защита от двойных вызовов)
+  // Автостарт workflow ОДИН РАЗ при монтировании
+  // Благодаря кэшу в startClientWorkflow, повторные вызовы не создают дубликатов
   useEffect(() => {
-    // Проверяем: не запускается ли уже, не запущен ли, доступен ли API
-    if (
-      !isStartingRef.current && 
-      !workflow.currentState && 
-      workflow.isApiAvailable && 
-      workflowId &&
-      startedWorkflowIdRef.current !== workflowId
-    ) {
-      isStartingRef.current = true;
-      startedWorkflowIdRef.current = workflowId;
-      
-      console.log('🚀 [ClientWorkflowRunner] Auto-starting workflow:', workflowId);
-      
-      workflow.startWorkflow(workflowId, initialContext)
-        .then(() => {
-          console.log('✅ [ClientWorkflowRunner] Workflow started successfully');
-        })
-        .catch(error => {
-          console.error('❌ [ClientWorkflowRunner] Failed to auto-start:', error);
-          isStartingRef.current = false;
-          startedWorkflowIdRef.current = null;
-        })
-        .finally(() => {
-          isStartingRef.current = false;
-        });
+    // Если уже запускали - выходим
+    if (hasMountedRef.current) {
+      console.log('⏭️ [ClientWorkflowRunner] Already mounted, skipping auto-start');
+      return;
     }
-  }, [workflowId, workflow.isApiAvailable, workflow.currentState]); // Правильные зависимости
+    
+    // Проверяем базовые условия
+    if (!workflow.isApiAvailable || !workflowId) {
+      console.log('⏭️ [ClientWorkflowRunner] Not ready:', {
+        isApiAvailable: workflow.isApiAvailable,
+        workflowId
+      });
+      return;
+    }
+    
+    // Если уже есть currentState - значит workflow уже запущен
+    if (workflow.currentState) {
+      console.log('⏭️ [ClientWorkflowRunner] Workflow already has state:', workflow.currentState);
+      hasMountedRef.current = true;
+      return;
+    }
+    
+    // Защита от параллельных запусков
+    if (isStartingRef.current) {
+      console.log('⏭️ [ClientWorkflowRunner] Already starting, skipping');
+      return;
+    }
+    
+    // Помечаем, что мы монтировались и стартуем
+    hasMountedRef.current = true;
+    isStartingRef.current = true;
+    startedWorkflowIdRef.current = workflowId;
+    
+    console.log('🚀 [ClientWorkflowRunner] Auto-starting workflow (ONCE):', workflowId);
+    console.log('📦 [ClientWorkflowRunner] initialContext передаваемый:', initialContext);
+    console.log('📏 [ClientWorkflowRunner] Размер initialContext:', Object.keys(initialContext).length, 'ключей');
+    
+    workflow.startWorkflow(workflowId, initialContext)
+      .then(() => {
+        console.log('✅ [ClientWorkflowRunner] Workflow started successfully');
+      })
+      .catch(error => {
+        console.error('❌ [ClientWorkflowRunner] Failed to auto-start:', error);
+        // При ошибке сбрасываем флаги, чтобы можно было повторить
+        hasMountedRef.current = false;
+        isStartingRef.current = false;
+        startedWorkflowIdRef.current = null;
+      })
+      .finally(() => {
+        isStartingRef.current = false;
+      });
+  }, [workflowId, workflow.isApiAvailable]); // Минимум зависимостей
 
   // Обновление formValues при изменении context
   useEffect(() => {

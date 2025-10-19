@@ -8,9 +8,10 @@ import { AnalyticsProvider } from './services/analytics';
 applyDesignTokens();
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  // Временно отключаем StrictMode для отладки множественных запросов
+  // <StrictMode>
     <AnalyticsProvider>
       <App />
     </AnalyticsProvider>
-  </StrictMode>
+  // </StrictMode>
 );

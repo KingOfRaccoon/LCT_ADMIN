@@ -7,10 +7,12 @@ import {
   isBindingValue,
   resolveBindingValue
 } from './utils/bindings';
+import { safeEvalExpression } from './utils/pythonToJs';
 import SandboxScreenRenderer from './SandboxScreenRenderer';
 import ApiSandboxRunner from './ApiSandboxRunner';
 import ClientWorkflowRunner from './ClientWorkflowRunner';
-import { checkClientWorkflowHealth } from '../../services/clientWorkflowApi';
+import { checkClientWorkflowHealth, startClientWorkflow } from '../../services/clientWorkflowApi';
+import { parseWorkflowUrlParams } from '../../utils/workflowApi';
 import {
   executeIntegrationNode,
   getNextStateFromIntegration
@@ -30,7 +32,7 @@ import {
 } from 'lucide-react';
 import { useAnalytics } from '../../services/analytics';
 import { WorkflowExportButton } from '../../components/WorkflowExportButton/WorkflowExportButton';
-import { loadWorkflow, parseWorkflowUrlParams } from '../../utils/workflowApi';
+import { loadWorkflow } from '../../utils/workflowApi';
 import toast from 'react-hot-toast';
 import './SandboxPage.css';
 
@@ -205,14 +207,16 @@ const SandboxPage = () => {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [activeWorkflowId, setActiveWorkflowId] = useState("68dedc98ea73d715d90e40dd"); // Для Client Workflow API
   
-  // ✅ ИСПРАВЛЕНИЕ: Если есть URL params с workflow_id, используем Client Workflow API напрямую
+  // ✅ УНИФИКАЦИЯ: Если есть URL params с workflow_id, сразу используем Client Workflow API без предзагрузки
   useEffect(() => {
     if (!clientSessionId || !clientWorkflowId) {
       return;
     }
     
-    console.log('✅ [SandboxPage] URL params detected, using Client Workflow API mode');
+    console.log('✅ [SandboxPage] URL params detected, using Client Workflow API directly');
+    
     // Устанавливаем workflow_id и переключаемся в client-ready режим
+    // Предзагрузка НЕ нужна - startClientWorkflow с кэшем сделает всё за нас
     setActiveWorkflowId(clientWorkflowId);
     setApiMode('client-ready');
   }, [clientSessionId, clientWorkflowId]);
@@ -231,10 +235,9 @@ const SandboxPage = () => {
     let cancelled = false;
 
     const checkApis = async () => {
-      // ✅ Если уже загружаем workflow через loadWorkflow, не используем Client Workflow API
+      // ✅ Если есть URL params, пропускаем проверку - уже установлен client-ready режим
       if (clientSessionId && clientWorkflowId) {
-        console.log('⚠️ [SandboxPage] Workflow loading via URL params, skipping API mode');
-        // Оставляем режим 'checking' до завершения загрузки
+        console.log('⏭️ [SandboxPage] Workflow from URL params, skipping API check');
         return;
       }
       
@@ -517,6 +520,8 @@ const SandboxPage = () => {
       return;
     }
 
+    console.log('[SandboxPage] handleInputChange called:', { name, value });
+
     setFormValues((prev) => {
       if (prev[name] === value) {
         return prev;
@@ -525,7 +530,10 @@ const SandboxPage = () => {
     });
 
     setContextState((prev) => {
+      console.log('[SandboxPage] Updating context, key:', `inputs.${name}`, 'value:', value);
+      console.log('[SandboxPage] Previous context:', prev);
       const next = applyContextPatch(prev, { [`inputs.${name}`]: value }, prev);
+      console.log('[SandboxPage] New context:', next);
       return next;
     });
   }, []);
@@ -612,6 +620,126 @@ const SandboxPage = () => {
     return null;
   }, [evaluateCondition]);
 
+  const evaluateTechnicalExpression = useCallback((rawExpression, context) => {
+    if (rawExpression === undefined || rawExpression === null) {
+      return rawExpression;
+    }
+
+    if (typeof rawExpression !== 'string') {
+      return rawExpression;
+    }
+
+    const trimmed = rawExpression.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+
+    // Шаблонные строки вида "${...}"
+    if (trimmed.includes('${')) {
+      return trimmed.replace(/\$\{([^}]+)\}/g, (match, innerExpression) => {
+        try {
+          const result = safeEvalExpression(innerExpression.trim(), context);
+          return result !== undefined && result !== null ? result : '';
+        } catch (error) {
+          console.warn('[SandboxPage] Failed to eval technical template expression:', innerExpression, error);
+          return '';
+        }
+      });
+    }
+
+    if (trimmed === 'true') {
+      return true;
+    }
+    if (trimmed === 'false') {
+      return false;
+    }
+    if (trimmed === 'null') {
+      return null;
+    }
+
+    try {
+      return safeEvalExpression(trimmed, context);
+    } catch (error) {
+      console.warn('[SandboxPage] Failed to eval technical expression:', trimmed, error);
+      return trimmed;
+    }
+  }, []);
+
+  const executeTechnicalState = useCallback((node, context) => {
+    if (!node) {
+      return {
+        context,
+        patch: {},
+        nextStateId: null,
+        transition: null
+      };
+    }
+
+    const expressions = Array.isArray(node.expressions) ? node.expressions : [];
+    let nextContext = context;
+    const patch = {};
+
+    expressions.forEach((expressionConfig) => {
+      const variablePath = expressionConfig?.variable;
+      if (!variablePath) {
+        return;
+      }
+
+      const rawExpression = expressionConfig.expression ?? expressionConfig.value ?? null;
+      const evaluatedValue = evaluateTechnicalExpression(rawExpression, nextContext);
+      if (evaluatedValue !== undefined) {
+        patch[variablePath] = evaluatedValue;
+        nextContext = applyContextPatch(nextContext, { [variablePath]: evaluatedValue }, nextContext);
+      }
+    });
+
+    const transitions = Array.isArray(node.transitions) ? node.transitions : [];
+    let selectedTransition = null;
+
+    for (let index = 0; index < transitions.length; index += 1) {
+      const transition = transitions[index];
+      if (!transition || !transition.state_id) {
+        continue;
+      }
+
+      // Если case отсутствует, считаем переход безусловным
+      if (!Object.prototype.hasOwnProperty.call(transition, 'case') || transition.case === null) {
+        selectedTransition = transition;
+        break;
+      }
+
+      const variablePath = transition.variable;
+      if (!variablePath) {
+        selectedTransition = transition;
+        break;
+      }
+
+      const currentValue = getContextValue(nextContext, variablePath);
+      if (currentValue === transition.case) {
+        selectedTransition = transition;
+        break;
+      }
+
+      if (currentValue !== undefined && currentValue !== null) {
+        if (String(currentValue) === String(transition.case)) {
+          selectedTransition = transition;
+          break;
+        }
+      }
+    }
+
+    if (!selectedTransition && transitions.length > 0) {
+      selectedTransition = transitions[0];
+    }
+
+    return {
+      context: nextContext,
+      patch,
+      nextStateId: selectedTransition?.state_id ?? null,
+      transition: selectedTransition
+    };
+  }, [evaluateTechnicalExpression]);
+
   const buildEdgeSequence = useCallback((edge, sourceNode, startingContext) => {
     if (!edge) {
       return {
@@ -633,26 +761,58 @@ const SandboxPage = () => {
     });
 
     let guard = 0;
-    while (currentNode && currentNode.type === 'action' && guard < 20) {
+    while (currentNode && guard < 20) {
       guard += 1;
-      const nextEdge = resolveActionEdge(currentNode, context);
-      if (!nextEdge) {
-        return {
-          context,
-          steps,
-          finalNodeId: currentNode.id
-        };
+      const nodeType = currentNode.type || currentNode.state_type;
+
+      if (nodeType === 'action') {
+        const nextEdge = resolveActionEdge(currentNode, context);
+        if (!nextEdge) {
+          return {
+            context,
+            steps,
+            finalNodeId: currentNode.id
+          };
+        }
+
+        const targetNode = getNodeById(nextEdge.target);
+        context = applyContextPatch(context, nextEdge.contextPatch ?? {}, context);
+        steps.push({
+          edge: nextEdge,
+          from: currentNode.id,
+          to: targetNode?.id ?? null,
+          patch: describePatch(nextEdge.contextPatch ?? {}, context)
+        });
+        currentNode = targetNode;
+        continue;
       }
 
-      const targetNode = getNodeById(nextEdge.target);
-      context = applyContextPatch(context, nextEdge.contextPatch ?? {}, context);
-      steps.push({
-        edge: nextEdge,
-        from: currentNode.id,
-        to: targetNode?.id ?? null,
-        patch: describePatch(nextEdge.contextPatch ?? {}, context)
-      });
-      currentNode = targetNode;
+      if (nodeType === 'technical') {
+        const technicalResult = executeTechnicalState(currentNode, context);
+        context = technicalResult.context;
+
+        const syntheticEdge = {
+          id: `${currentNode.id}::technical`,
+          label: currentNode.label || currentNode.name || currentNode.id,
+          summary: currentNode.description || technicalResult.transition?.event || 'Technical state'
+        };
+
+        steps.push({
+          edge: syntheticEdge,
+          from: currentNode.id,
+          to: technicalResult.nextStateId ?? null,
+          patch: describePatch(technicalResult.patch, context)
+        });
+
+        if (!technicalResult.nextStateId || technicalResult.nextStateId === currentNode.id) {
+          break;
+        }
+
+        currentNode = getNodeById(technicalResult.nextStateId);
+        continue;
+      }
+
+      break;
     }
 
     return {
@@ -660,7 +820,7 @@ const SandboxPage = () => {
       steps,
       finalNodeId: currentNode?.id ?? null
     };
-  }, [getNodeById, resolveActionEdge]);
+  }, [executeTechnicalState, getNodeById, resolveActionEdge]);
 
   const handleEdgeRun = useCallback((edge) => {
     if (!edge) {
@@ -779,10 +939,12 @@ const SandboxPage = () => {
 
   // Новый Client Workflow API режим (приоритет)
   if (isClientWorkflowReady) {
+    console.log('🔍 [SandboxPage] Режим Client Workflow API');
+    console.log('📦 [SandboxPage] activeWorkflowId:', activeWorkflowId);
     return (
       <ClientWorkflowRunner
         workflowId={activeWorkflowId}
-        initialContext={product?.initialContext || {}}
+        initialContext={{}}
         onExit={handleDisableApi}
       />
     );

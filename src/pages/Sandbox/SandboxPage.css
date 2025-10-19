@@ -442,6 +442,45 @@
   display: contents;
 }
 
+/* Стили для экрана с поддержкой overlay/bottom sheet */
+.sandbox-screen {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Слои overlay живут внутри контейнера экрана */
+.sandbox-section[data-slot="overlay"] {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  /* display управляется через inline стили из JSON */
+}
+
+/* Когда overlay активен (показан), включаем интерактивность */
+.sandbox-section[data-slot="overlay"][style*="display: flex"],
+.sandbox-section[data-slot="overlay"][style*="display:flex"] {
+  pointer-events: auto;
+}
+
+/* Дочерние элементы overlay ограничены размером экрана */
+.sandbox-section[data-slot="overlay"] > * {
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+}
+
 .sandbox-screen-empty {
   background: rgba(203, 213, 225, 0.3);
   border-radius: 20px;

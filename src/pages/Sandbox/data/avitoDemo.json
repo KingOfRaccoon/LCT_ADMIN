@@ -76,6 +76,34 @@
         "quantity": "number",
         "advertisement": "object"
       }
+    },
+    "selected_delivery_method": {
+      "type": "string",
+      "schema": null
+    },
+    "delivery_method_id": {
+      "type": "string",
+      "schema": null
+    },
+    "selected_payment_method": {
+      "type": "string",
+      "schema": null
+    },
+    "payment_method_id": {
+      "type": "string",
+      "schema": null
+    },
+    "delivery_methods": {
+      "type": "array",
+      "schema": []
+    },
+    "payment_methods": {
+      "type": "array",
+      "schema": []
+    },
+    "show_edit_recipient": {
+      "type": "boolean",
+      "schema": null
     }
   },
   "initialContext": {
@@ -116,6 +144,62 @@
     ],
     "recommendations": [],
     "removed_item": null,
+    "selected_delivery_method": "card-delivery-avito",
+    "delivery_method_id": "card-delivery-avito",
+    "selected_payment_method": "row-payment-wallet",
+    "payment_method_id": "row-payment-wallet",
+    "show_edit_recipient": false,
+    "delivery_methods": [
+      {
+        "id": "card-delivery-post",
+        "name": "Почта России",
+        "badge": "Сюда доставляли",
+        "badgeColor": "#8C4FE8",
+        "price": 2701,
+        "currency": "₽",
+        "deliveryTime": "1–4 дня",
+        "description": "2 701 ₽, 1–4 дня"
+      },
+      {
+        "id": "card-delivery-avito",
+        "name": "Авито",
+        "badge": "Лучшая цена",
+        "badgeColor": "#00B253",
+        "price": 1216,
+        "oldPrice": 5028,
+        "currency": "₽",
+        "deliveryTime": "1–4 дня",
+        "description": "1 216 ₽, 1–4 дня",
+        "recommended": true
+      }
+    ],
+    "payment_methods": [
+      {
+        "id": "row-payment-wallet",
+        "name": "Кошелёк",
+        "description": "Быстро пополнить через СБП",
+        "icon": "account_balance_wallet",
+        "iconColor": "#04E061",
+        "iconSize": 48
+      },
+      {
+        "id": "row-payment-tbank",
+        "name": "Т-Банк",
+        "description": "Мгновенно через СБП",
+        "icon": "account_balance",
+        "iconColor": "#FFDD2D",
+        "iconSize": 48,
+        "image": "https://avatars.mds.yandex.net/get-fintech/1401668/tinkoff_icon/orig"
+      },
+      {
+        "id": "row-payment-sbp",
+        "name": "СБП",
+        "description": "Оплата в приложении вашего банка",
+        "icon": "payment",
+        "iconColor": "#F2F1EF",
+        "iconSize": 48
+      }
+    ],
     "ui": {
       "ready": false,
       "notifications": {
@@ -184,7 +268,8 @@
         {
           "variable": "recommendations",
           "case": null,
-          "state_id": "cart-main"
+          "state_id": "cart-main",
+          "event": "_ready"
         }
       ],
       "edges": []
@@ -196,6 +281,15 @@
       "screenId": "screen-cart-main",
       "start": false,
       "edges": [
+        {
+          "id": "edge-ready",
+          "label": "Инициализация экрана",
+          "event": "_ready",
+          "keepInputs": true,
+          "summary": "Автоматический переход при загрузке экрана",
+          "target": "cart-main",
+          "contextPatch": {}
+        },
         {
           "id": "edge-add-to-cart",
           "label": "Добавить товар",
@@ -311,7 +405,7 @@
           "event": "checkout",
           "keepInputs": true,
           "summary": "Переход к оформлению заказа",
-          "target": "checkout-screen",
+          "target": "fetch-shipping-methods",
           "contextPatch": {}
         },
         {
@@ -785,11 +879,276 @@
       "edges": []
     },
     {
+      "id": "fetch-shipping-methods",
+      "label": "Загрузка методов доставки",
+      "type": "integration",
+      "state_type": "integration",
+      "start": false,
+      "description": "Загружает доступные методы доставки",
+      "expressions": [
+        {
+          "variable": "delivery_methods",
+          "url": "https://sandkittens.me/backservices/api/shipping-methods",
+          "params": {},
+          "method": "get",
+          "metadata": {
+            "description": "Получает список доступных методов доставки",
+            "category": "data",
+            "tags": ["integration", "api", "shipping", "delivery"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "delivery_methods",
+          "case": null,
+          "state_id": "fetch-payment-methods"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "fetch-payment-methods",
+      "label": "Загрузка способов оплаты",
+      "type": "integration",
+      "state_type": "integration",
+      "start": false,
+      "description": "Загружает доступные способы оплаты",
+      "expressions": [
+        {
+          "variable": "payment_methods",
+          "url": "https://sandkittens.me/backservices/api/payment-methods",
+          "params": {},
+          "method": "get",
+          "metadata": {
+            "description": "Получает список доступных способов оплаты",
+            "category": "data",
+            "tags": ["integration", "api", "payment"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "payment_methods",
+          "case": null,
+          "state_id": "checkout-screen",
+          "event": "_ready"
+        }
+      ],
+      "edges": []
+    },
+    {
       "id": "checkout-screen",
       "label": "Оформление заказа",
       "type": "screen",
       "screenId": "screen-checkout",
+      "edges": [
+        {
+          "id": "edge-ready",
+          "label": "Инициализация экрана",
+          "event": "_ready",
+          "keepInputs": true,
+          "summary": "Автоматический переход при загрузке экрана",
+          "target": "checkout-screen",
+          "contextPatch": {}
+        },
+        {
+          "id": "edge-select-delivery-method",
+          "label": "Выбрать способ доставки",
+          "event": "selectDeliveryMethod",
+          "keepInputs": true,
+          "summary": "Выбор способа доставки",
+          "target": "save-delivery-selection",
+          "contextPatch": {
+            "delivery_method_id": {
+              "reference": "${eventParams.delivery_method_id}",
+              "value": null
+            }
+          }
+        },
+        {
+          "id": "edge-select-payment-method",
+          "label": "Выбрать способ оплаты",
+          "event": "selectPaymentMethod",
+          "keepInputs": true,
+          "summary": "Выбор способа оплаты",
+          "target": "save-payment-selection",
+          "contextPatch": {
+            "payment_method_id": {
+              "reference": "${eventParams.payment_method_id}",
+              "value": null
+            }
+          }
+        },
+        {
+          "id": "edge-proceed-to-payment",
+          "label": "Перейти к оплате",
+          "event": "proceedToPayment",
+          "keepInputs": true,
+          "summary": "Переход к оплате с выбранными методами",
+          "target": "order-success",
+          "contextPatch": {
+            "final_delivery_method": {
+              "reference": "${selected_delivery_method}",
+              "value": null
+            },
+            "final_payment_method": {
+              "reference": "${selected_payment_method}",
+              "value": null
+            }
+          }
+        },
+        {
+          "id": "edge-show-edit-recipient",
+          "label": "Показать форму редактирования получателя",
+          "event": "showEditRecipient",
+          "keepInputs": true,
+          "summary": "Открытие формы редактирования данных получателя",
+          "target": "show-edit-recipient-form",
+          "contextPatch": {}
+        },
+        {
+          "id": "edge-save-recipient",
+          "label": "Сохранить получателя",
+          "event": "saveRecipient",
+          "keepInputs": true,
+          "summary": "Сохранение данных получателя и закрытие формы",
+          "target": "hide-edit-recipient-form",
+          "contextPatch": {}
+        },
+        {
+          "id": "edge-close-recipient-form",
+          "label": "Закрыть форму получателя",
+          "event": "closeRecipientForm",
+          "keepInputs": true,
+          "summary": "Закрытие формы без сохранения",
+          "target": "hide-edit-recipient-form",
+          "contextPatch": {}
+        }
+      ]
+    },
+    {
+      "id": "show-edit-recipient-form",
+      "label": "Показать форму получателя",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Устанавливает флаг отображения формы редактирования получателя",
+      "expressions": [
+        {
+          "variable": "show_edit_recipient",
+          "expression": "true",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Показывает BottomSheet с формой редактирования",
+            "category": "ui",
+            "tags": ["recipient", "bottomsheet"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "show_edit_recipient",
+          "case": null,
+          "state_id": "checkout-screen",
+          "event": "_ready"
+        }
+      ],
       "edges": []
+    },
+    {
+      "id": "hide-edit-recipient-form",
+      "label": "Скрыть форму получателя",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Скрывает форму редактирования получателя",
+      "expressions": [
+        {
+          "variable": "show_edit_recipient",
+          "expression": "false",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Скрывает BottomSheet",
+            "category": "ui",
+            "tags": ["recipient", "bottomsheet"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "show_edit_recipient",
+          "case": null,
+          "state_id": "checkout-screen",
+          "event": "_ready"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "save-delivery-selection",
+      "label": "Сохранение выбора доставки",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Сохраняет выбранный способ доставки в контекст",
+      "expressions": [
+        {
+          "variable": "delivery_method_id",
+          "expression": "${delivery_method_id}",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Сохраняет ID выбранного способа доставки",
+            "category": "data",
+            "tags": ["delivery", "selection"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "delivery_method_id",
+          "case": null,
+          "state_id": "checkout-screen",
+          "event": "_ready"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "save-payment-selection",
+      "label": "Сохранение выбора оплаты",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Сохраняет выбранный способ оплаты в контекст",
+      "expressions": [
+        {
+          "variable": "payment_method_id",
+          "expression": "${payment_method_id}",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Сохраняет ID выбранного способа оплаты",
+            "category": "data",
+            "tags": ["payment", "selection"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "payment_method_id",
+          "case": null,
+          "state_id": "checkout-screen",
+          "event": "_ready"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "order-success",
+      "label": "Заказ оформлен",
+      "type": "final",
+      "final": true,
+      "description": "Финальное состояние - заказ успешно оформлен"
     }
   ],
   "screens": {
@@ -801,9 +1160,13 @@
         "display": "flex",
         "flexDirection": "column",
         "minHeight": "720px",
+        "maxWidth": "480px",
+        "margin": "0 auto",
         "backgroundColor": "#ffffff",
         "borderRadius": "12px",
-        "padding": "0px"
+        "padding": "0px",
+        "position": "relative",
+        "overflow": "hidden"
       },
       "sections": {
         "header": {
@@ -1207,7 +1570,7 @@
                                       "type": "image",
                                       "properties": {
                                         "src": {
-                                          "reference": "${product.image || 'https://via.placeholder.com/80'}",
+                                          "reference": "${product.image_url || 'https://via.placeholder.com/80'}",
                                           "value": "https://via.placeholder.com/80"
                                         },
                                         "alt": "Фото товара"
@@ -1661,7 +2024,7 @@
                                   "type": "image",
                                   "properties": {
                                     "src": {
-                                      "reference": "${suggested.image ? suggested.image : 'https://via.placeholder.com/136x136'}",
+                                      "reference": "${suggested.image_url : 'https://via.placeholder.com/136x136'}",
                                       "value": "https://via.placeholder.com/136x136"
                                     },
                                     "alt": "Предлагаемый товар"
@@ -1960,53 +2323,1052 @@
     "screen-checkout": {
       "id": "screen-checkout",
       "type": "Screen",
-      "name": "Оформление",
+      "name": "Оформление доставки",
       "style": {
         "display": "flex",
         "flexDirection": "column",
-        "minHeight": "720px",
-        "backgroundColor": "#ffffff",
-        "borderRadius": "12px",
-        "padding": "0px"
+        "minHeight": "100vh",
+        "maxWidth": "480px",
+        "margin": "0 auto",
+        "backgroundColor": "#F2F1F0",
+        "padding": "0px",
+        "position": "relative",
+        "overflow": "hidden"
       },
       "sections": {
+        "header": {
+          "id": "section-checkout-header",
+          "type": "Section",
+          "properties": {
+            "slot": "header",
+            "padding": 0,
+            "spacing": 0,
+            "background": "#ffffff"
+          },
+          "style": {
+            "borderBottom": "1px solid #E5E5E5"
+          },
+          "children": [
+            {
+              "id": "row-checkout-navbar",
+              "type": "row",
+              "properties": {
+                "spacing": 48,
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "padding": 12
+              },
+              "style": {
+                "height": "48px"
+              },
+              "children": [
+                {
+                  "id": "icon-close",
+                  "type": "icon",
+                  "properties": {
+                    "name": "close",
+                    "size": 24,
+                    "color": "#000000"
+                  },
+                  "style": {
+                    "cursor": "pointer"
+                  }
+                },
+                {
+                  "id": "text-checkout-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Оформление доставки",
+                    "variant": "h5"
+                  },
+                  "style": {
+                    "fontSize": "16px",
+                    "fontWeight": "800",
+                    "lineHeight": "20px",
+                    "textAlign": "center",
+                    "flex": "1"
+                  }
+                },
+                {
+                  "id": "spacer-right",
+                  "type": "text",
+                  "properties": {
+                    "content": ""
+                  },
+                  "style": {
+                    "width": "24px"
+                  }
+                }
+              ]
+            }
+          ]
+        },
         "body": {
           "id": "section-checkout-body",
           "type": "Section",
           "properties": {
             "slot": "body",
-            "padding": 32,
+            "padding": 16,
             "spacing": 16,
             "alignItems": "stretch"
           },
           "style": {
-            "flex": "1 1 auto"
+            "flex": "1 1 auto",
+            "overflowY": "auto"
           },
           "children": [
             {
-              "id": "text-checkout-title",
-              "type": "text",
+              "id": "section-delivery-method",
+              "type": "column",
               "properties": {
-                "content": "Оформление заказа",
-                "variant": "heading"
+                "spacing": 16
               },
-              "style": {
-                "fontSize": "24px",
-                "fontWeight": 700,
-                "color": "#2F3034"
-              }
+              "children": [
+                {
+                  "id": "text-delivery-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Способ получения",
+                    "variant": "h3"
+                  },
+                  "style": {
+                    "fontSize": "21px",
+                    "fontWeight": "800",
+                    "lineHeight": "26px",
+                    "color": "#000000"
+                  }
+                },
+                {
+                  "id": "text-delivery-address-label",
+                  "type": "text",
+                  "properties": {
+                    "content": "Для адреса: 📍 Москва, ул. Лесная, 7",
+                    "variant": "body"
+                  },
+                  "style": {
+                    "fontSize": "15px",
+                    "fontWeight": "500",
+                    "lineHeight": "20px",
+                    "color": "#000000"
+                  }
+                },
+                {
+                  "id": "row-delivery-options",
+                  "type": "list",
+                  "properties": {
+                    "dataSource": {
+                      "reference": "${delivery_methods}",
+                      "value": []
+                    },
+                    "itemAlias": "delivery"
+                  },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "row",
+                    "gap": "6px",
+                    "overflowX": "auto"
+                  },
+                  "children": [
+                    {
+                      "id": "card-delivery-{{itemIndex}}",
+                      "type": "card",
+                      "properties": {
+                        "spacing": 4,
+                        "padding": 12,
+                        "event": "selectDeliveryMethod",
+                        "eventParams": {
+                          "delivery_method_id": {
+                            "reference": "${delivery.id}",
+                            "value": null
+                          }
+                        }
+                      },
+                      "style": {
+                        "backgroundColor": "#F2F1F0",
+                        "borderRadius": "16px",
+                        "border": {
+                          "reference": "${delivery_method_id == delivery.id ? '2px solid #000000' : '2px solid transparent'}",
+                          "value": "2px solid transparent"
+                        },
+                        "minWidth": "150px",
+                        "position": "relative",
+                        "cursor": "pointer"
+                      },
+                      "children": [
+                        {
+                          "id": "icon-checkmark-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${delivery_method_id == delivery.id}",
+                              "value": false
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "icon-check-inner-{{itemIndex}}",
+                              "type": "icon",
+                              "properties": {
+                                "name": "check_circle",
+                                "size": 18,
+                                "color": "#141414"
+                              },
+                              "style": {
+                                "position": "absolute",
+                                "top": "10px",
+                                "right": "10px"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "text-badge-{{itemIndex}}",
+                          "type": "text",
+                          "properties": {
+                            "content": {
+                              "reference": "${delivery.badge}",
+                              "value": "Badge"
+                            },
+                            "variant": "caption"
+                          },
+                          "style": {
+                            "fontSize": "11px",
+                            "fontWeight": "500",
+                            "color": {
+                              "reference": "${delivery.badgeColor}",
+                              "value": "#8C4FE8"
+                            }
+                          }
+                        },
+                        {
+                          "id": "text-name-{{itemIndex}}",
+                          "type": "text",
+                          "properties": {
+                            "content": {
+                              "reference": "${delivery.name}",
+                              "value": "Название"
+                            },
+                            "variant": "body"
+                          },
+                          "style": {
+                            "fontSize": "13px",
+                            "fontWeight": "500",
+                            "color": {
+                              "reference": "${delivery.recommended ? '#000000' : '#757575'}",
+                              "value": "#757575"
+                            }
+                          }
+                        },
+                        {
+                          "id": "conditional-old-price-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${delivery.oldPrice !== undefined}",
+                              "value": false
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "row-price-comparison-{{itemIndex}}",
+                              "type": "row",
+                              "properties": {
+                                "spacing": 2,
+                                "alignItems": "center"
+                              },
+                              "children": [
+                                {
+                                  "id": "text-old-price-{{itemIndex}}",
+                                  "type": "text",
+                                  "properties": {
+                                    "content": {
+                                      "reference": "${delivery.oldPrice + ' ' + delivery.currency}",
+                                      "value": "0 ₽"
+                                    },
+                                    "variant": "body"
+                                  },
+                                  "style": {
+                                    "fontSize": "13px",
+                                    "fontWeight": "500",
+                                    "color": "#000000",
+                                    "textDecoration": "line-through",
+                                    "textDecorationColor": "#FF4053"
+                                  }
+                                },
+                                {
+                                  "id": "text-new-price-{{itemIndex}}",
+                                  "type": "text",
+                                  "properties": {
+                                    "content": {
+                                      "reference": "${delivery.price + ' ' + delivery.currency + ', ' + delivery.deliveryTime}",
+                                      "value": "0 ₽"
+                                    },
+                                    "variant": "body"
+                                  },
+                                  "style": {
+                                    "fontSize": "13px",
+                                    "fontWeight": "800",
+                                    "color": "#FF4053"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "conditional-regular-price-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${delivery.oldPrice === undefined}",
+                              "value": true
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "text-regular-price-{{itemIndex}}",
+                              "type": "text",
+                              "properties": {
+                                "content": {
+                                  "reference": "${delivery.price} ₽",
+                                  "value": "0 ₽"
+                                },
+                                "variant": "body"
+                              },
+                              "style": {
+                                "fontSize": "13px",
+                                "fontWeight": "500",
+                                "color": "#000000"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             {
-              "id": "text-checkout-placeholder",
-              "type": "text",
+              "id": "section-recipient",
+              "type": "column",
               "properties": {
-                "content": "Форма оформления появится здесь",
-                "variant": "body"
+                "spacing": 12,
+                "padding": "20 16"
               },
               "style": {
-                "fontSize": "15px",
-                "color": "#8E8E93"
-              }
+                "backgroundColor": "#FFFFFF",
+                "borderRadius": "20px"
+              },
+              "children": [
+                {
+                  "id": "text-recipient-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Получатель",
+                    "variant": "h3"
+                  },
+                  "style": {
+                    "fontSize": "21px",
+                    "fontWeight": "800",
+                    "lineHeight": "26px"
+                  }
+                },
+                {
+                  "id": "column-recipient-info",
+                  "type": "column",
+                  "properties": {
+                    "spacing": 2
+                  },
+                  "children": [
+                    {
+                      "id": "text-recipient-name",
+                      "type": "text",
+                      "properties": {
+                        "content": "Князева Екатерина",
+                        "variant": "body"
+                      },
+                      "style": {
+                        "fontSize": "15px",
+                        "fontWeight": "500",
+                        "lineHeight": "22px"
+                      }
+                    },
+                    {
+                      "id": "row-recipient-contacts",
+                      "type": "row",
+                      "properties": {
+                        "spacing": 4
+                      },
+                      "children": [
+                        {
+                          "id": "text-recipient-phone",
+                          "type": "text",
+                          "properties": {
+                            "content": "+7 800 555-35-35",
+                            "variant": "body"
+                          },
+                          "style": {
+                            "fontSize": "15px",
+                            "fontWeight": "500",
+                            "lineHeight": "20px"
+                          }
+                        },
+                        {
+                          "id": "text-recipient-email",
+                          "type": "text",
+                          "properties": {
+                            "content": "catherineu@gmail.com",
+                            "variant": "body"
+                          },
+                          "style": {
+                            "fontSize": "15px",
+                            "fontWeight": "500",
+                            "lineHeight": "20px",
+                            "flex": "1"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "button-change-recipient",
+                  "type": "button",
+                  "properties": {
+                    "text": "Изменить получателя",
+                    "variant": "secondary",
+                    "event": "showEditRecipient"
+                  },
+                  "style": {
+                    "backgroundColor": "#F2F1F0",
+                    "borderRadius": "12px",
+                    "padding": "11px 17px 13px 16px",
+                    "fontSize": "15px",
+                    "fontWeight": "500",
+                    "color": "#000000",
+                    "border": "none",
+                    "cursor": "pointer"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "section-payment-methods",
+              "type": "column",
+              "properties": {
+                "spacing": 16,
+                "padding": "24 16"
+              },
+              "children": [
+                {
+                  "id": "text-payment-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Способы оплаты",
+                    "variant": "h3"
+                  },
+                  "style": {
+                    "fontSize": "21px",
+                    "fontWeight": "800",
+                    "lineHeight": "26px"
+                  }
+                },
+                {
+                  "id": "column-payment-options",
+                  "type": "list",
+                  "properties": {
+                    "dataSource": {
+                      "reference": "${payment_methods}",
+                      "value": []
+                    },
+                    "itemAlias": "payment"
+                  },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "10px"
+                  },
+                  "children": [
+                    {
+                      "id": "row-payment-{{itemIndex}}",
+                      "type": "card",
+                      "properties": {
+                        "spacing": 12,
+                        "alignItems": "center",
+                        "padding": "11 0",
+                        "event": "selectPaymentMethod",
+                        "eventParams": {
+                          "payment_method_id": {
+                            "reference": "${payment.id}",
+                            "value": null
+                          }
+                        }
+                      },
+                      "style": {
+                        "cursor": "pointer",
+                        "display": "flex",
+                        "flexDirection": "row",
+                        "border": {
+                          "reference": "${payment_method_id == payment.id ? '2px solid #000000' : '2px solid transparent'}",
+                          "value": "2px solid transparent"
+                        },
+                        "borderRadius": "12px",
+                        "padding": "8px"
+                      },
+                      "children": [
+                        {
+                          "id": "conditional-payment-visual-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${payment.image !== undefined && payment.image !== null}",
+                              "value": false
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "image-payment-{{itemIndex}}",
+                              "type": "image",
+                              "properties": {
+                                "src": {
+                                  "reference": "${payment.image}",
+                                  "value": "https://via.placeholder.com/48"
+                                },
+                                "alt": {
+                                  "reference": "${payment.name}",
+                                  "value": "Способ оплаты"
+                                }
+                              },
+                              "style": {
+                                "width": "48px",
+                                "height": "48px",
+                                "borderRadius": "8px",
+                                "objectFit": "cover"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "conditional-payment-icon-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${payment.image === undefined || payment.image === null}",
+                              "value": true
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "icon-payment-{{itemIndex}}",
+                              "type": "icon",
+                              "properties": {
+                                "name": {
+                                  "reference": "${payment.icon}",
+                                  "value": "payment"
+                                },
+                                "size": {
+                                  "reference": "${payment.iconSize}",
+                                  "value": 48
+                                },
+                                "color": {
+                                  "reference": "${payment.iconColor}",
+                                  "value": "#04E061"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "column-payment-info-{{itemIndex}}",
+                          "type": "column",
+                          "properties": {
+                            "spacing": 2
+                          },
+                          "style": {
+                            "flex": "1"
+                          },
+                          "children": [
+                            {
+                              "id": "text-payment-name-{{itemIndex}}",
+                              "type": "text",
+                              "properties": {
+                                "content": {
+                                  "reference": "${payment.name}",
+                                  "value": "Название"
+                                },
+                                "variant": "body"
+                              },
+                              "style": {
+                                "fontSize": "15px",
+                                "fontWeight": "500",
+                                "lineHeight": "20px"
+                              }
+                            },
+                            {
+                              "id": "text-payment-description-{{itemIndex}}",
+                              "type": "text",
+                              "properties": {
+                                "content": {
+                                  "reference": "${payment.description}",
+                                  "value": "Описание"
+                                },
+                                "variant": "caption"
+                              },
+                              "style": {
+                                "fontSize": "13px",
+                                "fontWeight": "500",
+                                "lineHeight": "16px",
+                                "color": "#757575"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "icon-check-payment-conditional-{{itemIndex}}",
+                          "type": "conditional",
+                          "properties": {
+                            "condition": {
+                              "reference": "${payment_method_id == payment.id}",
+                              "value": false
+                            }
+                          },
+                          "children": [
+                            {
+                              "id": "icon-check-payment-{{itemIndex}}",
+                              "type": "icon",
+                              "properties": {
+                                "name": "check_circle",
+                                "size": 20,
+                                "color": "#141414"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "button-show-all-payments",
+                  "type": "button",
+                  "properties": {
+                    "text": "Открыть все",
+                    "variant": "secondary"
+                  },
+                  "style": {
+                    "backgroundColor": "#F2F1F0",
+                    "borderRadius": "12px",
+                    "padding": "11px 17px 13px 16px",
+                    "fontSize": "15px",
+                    "fontWeight": "500",
+                    "color": "#000000",
+                    "border": "none",
+                    "cursor": "pointer",
+                    "width": "100%"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "footer": {
+          "id": "section-checkout-footer",
+          "type": "Section",
+          "properties": {
+            "slot": "footer",
+            "padding": 0,
+            "spacing": 0,
+            "background": "#ffffff"
+          },
+          "style": {
+            "borderTop": "none",
+            "boxShadow": "0 1px 3px rgba(0, 0, 0, 0.05)",
+            "borderRadius": "24px 24px 0 0"
+          },
+          "children": [
+            {
+              "id": "column-footer-content",
+              "type": "column",
+              "properties": {
+                "spacing": 12,
+                "padding": "20 16 0"
+              },
+              "children": [
+                {
+                  "id": "row-total-summary",
+                  "type": "row",
+                  "properties": {
+                    "spacing": 26,
+                    "alignItems": "flex-start",
+                    "justifyContent": "space-between"
+                  },
+                  "children": [
+                    {
+                      "id": "text-total-label",
+                      "type": "text",
+                      "properties": {
+                        "content": "Итого с доставкой:",
+                        "variant": "body"
+                      },
+                      "style": {
+                        "fontSize": "15px",
+                        "fontWeight": "500",
+                        "lineHeight": "20px"
+                      }
+                    },
+                    {
+                      "id": "text-total-amount",
+                      "type": "text",
+                      "properties": {
+                        "content": {
+                          "reference": "${cart_response.total_amount + 1216 + 157 + 1059} ₽",
+                          "value": "110 687 ₽"
+                        },
+                        "variant": "h5"
+                      },
+                      "style": {
+                        "fontSize": "16px",
+                        "fontWeight": "800",
+                        "lineHeight": "20px",
+                        "textAlign": "right"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "row-checkout-button",
+                  "type": "row",
+                  "properties": {
+                    "spacing": 6,
+                    "alignItems": "flex-start"
+                  },
+                  "children": [
+                    {
+                      "id": "icon-payment",
+                      "type": "icon",
+                      "properties": {
+                        "name": "account_balance_wallet",
+                        "size": 52,
+                        "color": "#F2F1F0"
+                      }
+                    },
+                    {
+                      "id": "button-checkout",
+                      "type": "button",
+                      "properties": {
+                        "text": "Перейти к оплате",
+                        "variant": "primary",
+                        "event": "proceedToPayment"
+                      },
+                      "style": {
+                        "backgroundColor": "#141414",
+                        "borderRadius": "16px",
+                        "padding": "15px 19px 17px 18px",
+                        "fontSize": "15px",
+                        "fontWeight": "500",
+                        "color": "#FFFFFF",
+                        "border": "none",
+                        "cursor": "pointer",
+                        "flex": "1"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "overlay": {
+          "id": "section-edit-recipient-bottomsheet",
+          "type": "Section",
+          "properties": {
+            "slot": "overlay",
+            "padding": 0,
+            "spacing": 0
+          },
+          "style": {
+            "zIndex": "1000",
+            "backgroundColor": "rgba(0, 0, 0, 0.5)",
+            "display": "none",
+            "flexDirection": "column",
+            "justifyContent": "flex-end",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "id": "bottomsheet-backdrop",
+              "type": "column",
+              "properties": {
+                "spacing": 0,
+                "event": "closeRecipientForm"
+              },
+              "style": {
+                "flex": "1",
+                "width": "100%",
+                "cursor": "pointer"
+              },
+              "children": []
+            },
+            {
+              "id": "bottomsheet-container",
+              "type": "column",
+              "properties": {
+                "spacing": 0
+              },
+              "style": {
+                "backgroundColor": "#FFFFFF",
+                "borderRadius": "28px 28px 0 0",
+                "padding": "16px 16px 0",
+                "boxShadow": "0px 1px 3px 0px rgba(0, 0, 0, 0.1)",
+                "width": "100%",
+                "maxHeight": "80vh",
+                "flexShrink": "0",
+                "overflow": "auto"
+              },
+              "children": [
+                {
+                  "id": "bottomsheet-handle",
+                  "type": "column",
+                  "properties": {
+                    "spacing": 0
+                  },
+                  "style": {
+                    "width": "40px",
+                    "height": "4px",
+                    "backgroundColor": "#D0D0D0",
+                    "borderRadius": "3px",
+                    "alignSelf": "center",
+                    "marginBottom": "12px"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "text-bottomsheet-title",
+                  "type": "text",
+                  "properties": {
+                    "content": "Получатель",
+                    "variant": "h3"
+                  },
+                  "style": {
+                    "fontSize": "21px",
+                    "fontWeight": "800",
+                    "lineHeight": "26px",
+                    "marginBottom": "16px"
+                  }
+                },
+                {
+                  "id": "column-recipient-fields",
+                  "type": "column",
+                  "properties": {
+                    "spacing": 16
+                  },
+                  "children": [
+                    {
+                      "id": "column-field-name",
+                      "type": "column",
+                      "properties": {
+                        "spacing": 12
+                      },
+                      "children": [
+                        {
+                          "id": "text-label-name",
+                          "type": "text",
+                          "properties": {
+                            "content": "ФИО",
+                            "variant": "h5"
+                          },
+                          "style": {
+                            "fontSize": "16px",
+                            "fontWeight": "800",
+                            "lineHeight": "20px"
+                          }
+                        },
+                        {
+                          "id": "row-input-name",
+                          "type": "row",
+                          "properties": {
+                            "spacing": 4,
+                            "alignItems": "center"
+                          },
+                          "style": {
+                            "backgroundColor": "#F2F1F0",
+                            "borderRadius": "12px",
+                            "padding": "11px 12px 13px 16px"
+                          },
+                          "children": [
+                            {
+                              "id": "text-value-name",
+                              "type": "text",
+                              "properties": {
+                                "content": "Князева Екатерина",
+                                "variant": "body"
+                              },
+                              "style": {
+                                "fontSize": "15px",
+                                "fontWeight": "500",
+                                "lineHeight": "20px",
+                                "flex": "1"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "column-field-phone",
+                      "type": "column",
+                      "properties": {
+                        "spacing": 12
+                      },
+                      "children": [
+                        {
+                          "id": "text-label-phone",
+                          "type": "text",
+                          "properties": {
+                            "content": "Телефон",
+                            "variant": "h5"
+                          },
+                          "style": {
+                            "fontSize": "16px",
+                            "fontWeight": "800",
+                            "lineHeight": "20px"
+                          }
+                        },
+                        {
+                          "id": "row-input-phone",
+                          "type": "row",
+                          "properties": {
+                            "spacing": 4,
+                            "alignItems": "center"
+                          },
+                          "style": {
+                            "backgroundColor": "#F2F1F0",
+                            "borderRadius": "12px",
+                            "padding": "11px 12px 13px 16px"
+                          },
+                          "children": [
+                            {
+                              "id": "text-value-phone",
+                              "type": "text",
+                              "properties": {
+                                "content": "+7 800 555-35-35",
+                                "variant": "body"
+                              },
+                              "style": {
+                                "fontSize": "15px",
+                                "fontWeight": "500",
+                                "lineHeight": "20px",
+                                "flex": "1"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "text-hint-phone",
+                          "type": "text",
+                          "properties": {
+                            "content": "Отправим на этот номер код выдачи заказа",
+                            "variant": "caption"
+                          },
+                          "style": {
+                            "fontSize": "13px",
+                            "fontWeight": "500",
+                            "lineHeight": "18px",
+                            "color": "#757575"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "column-field-email",
+                      "type": "column",
+                      "properties": {
+                        "spacing": 12
+                      },
+                      "children": [
+                        {
+                          "id": "text-label-email",
+                          "type": "text",
+                          "properties": {
+                            "content": "Почта",
+                            "variant": "h5"
+                          },
+                          "style": {
+                            "fontSize": "16px",
+                            "fontWeight": "800",
+                            "lineHeight": "20px"
+                          }
+                        },
+                        {
+                          "id": "row-input-email",
+                          "type": "row",
+                          "properties": {
+                            "spacing": 4,
+                            "alignItems": "center"
+                          },
+                          "style": {
+                            "backgroundColor": "#F2F1F0",
+                            "borderRadius": "12px",
+                            "padding": "11px 12px 13px 16px"
+                          },
+                          "children": [
+                            {
+                              "id": "text-value-email",
+                              "type": "text",
+                              "properties": {
+                                "content": "catherineu@gmail.com",
+                                "variant": "body"
+                              },
+                              "style": {
+                                "fontSize": "15px",
+                                "fontWeight": "500",
+                                "lineHeight": "20px",
+                                "flex": "1"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "text-hint-email",
+                          "type": "text",
+                          "properties": {
+                            "content": "На этот адрес придёт чек",
+                            "variant": "caption"
+                          },
+                          "style": {
+                            "fontSize": "13px",
+                            "fontWeight": "500",
+                            "lineHeight": "18px",
+                            "color": "#757575"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "button-save-recipient",
+                  "type": "button",
+                  "properties": {
+                    "text": "Сохранить получателя",
+                    "variant": "primary",
+                    "event": "saveRecipient"
+                  },
+                  "style": {
+                    "backgroundColor": "#141414",
+                    "borderRadius": "16px",
+                    "padding": "15px 19px 17px 18px",
+                    "fontSize": "15px",
+                    "fontWeight": "500",
+                    "color": "#FFFFFF",
+                    "border": "none",
+                    "cursor": "pointer",
+                    "marginTop": "16px",
+                    "marginBottom": "16px"
+                  }
+                }
+              ]
             }
           ]
         }

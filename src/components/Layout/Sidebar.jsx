@@ -48,7 +48,7 @@ const Sidebar = ({ collapsed, currentPath, mobileOpen }) => {
         {
           label: 'Sandbox',
           icon: FlaskConical,
-          path: '/sandbox?workflow_id=68dee410d2da09b7b691b749',
+          path: '/sandbox?workflow_id=68f547233f1306d9716f1352',
           active: currentPath === '/sandbox'
         },
         {

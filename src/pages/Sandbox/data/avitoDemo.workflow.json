@@ -937,7 +937,7 @@
                                           "type": "image",
                                           "properties": {
                                             "src": {
-                                              "reference": "${suggested.image : 'https://via.placeholder.com/136x136'}",
+                                              "reference": "${suggested.image_url ? suggested.image_url : 'https://via.placeholder.com/136x136'}",
                                               "value": "https://via.placeholder.com/136x136"
                                             },
                                             "alt": "Предлагаемый товар"

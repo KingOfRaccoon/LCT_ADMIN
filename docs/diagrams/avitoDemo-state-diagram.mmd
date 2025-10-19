@@ -1,0 +1,85 @@
+graph TB
+    START([START]) --> fetch_cart_items
+    
+    fetch_cart_items["`**fetch-cart-items**
+    Integration State
+    GET /api/carts/3/with-advertisements
+    ↓ cart_response`"]
+    
+    fetch_cart_items --> cart_main
+    
+    cart_main["`**cart-main**
+    Screen State
+    screen-cart-main
+    9 событий пользователя`"]
+    
+    cart_main -->|addToCart| add_to_cart
+    cart_main -->|increaseQuantity| increase_quantity
+    cart_main -->|decreaseQuantity| decrease_quantity
+    cart_main -->|removeItem| remove_item
+    cart_main -->|toggleFocus| toggle_focus
+    cart_main -->|toggleShopSelection| toggle_shop_selection
+    cart_main -->|toggleSelectAll| toggle_select_all
+    cart_main -->|deleteSelected| delete_selected
+    cart_main -->|checkout| checkout_screen
+    
+    add_to_cart["`**add-to-cart-integration**
+    POST /api/carts/add-advertisement
+    body: cart_id, advertisement_id`"]
+    
+    increase_quantity["`**increase-quantity-integration**
+    PATCH /api/carts/3/items/{id}
+    body: quantity + 1`"]
+    
+    decrease_quantity["`**decrease-quantity-integration**
+    PATCH /api/carts/3/items/{id}
+    body: quantity - 1`"]
+    
+    remove_item["`**remove-item-integration**
+    DELETE /api/carts/3/items/{id}`"]
+    
+    toggle_focus["`**toggle-focus-integration**
+    PATCH /api/carts/3/items/{id}
+    body: toggle selected`"]
+    
+    toggle_shop_selection["`**toggle-shop-selection-integration**
+    PATCH /api/carts/3/shops/{id}/toggle-selection
+    body: empty`"]
+    
+    toggle_select_all["`**toggle-select-all-integration**
+    PATCH /api/carts/3/toggle-select-all
+    body: empty`"]
+    
+    delete_selected["`**delete-selected-integration**
+    DELETE /api/carts/3/selected-items`"]
+    
+    checkout_screen["`**checkout-screen**
+    Screen State
+    screen-checkout`"]
+    
+    add_to_cart -->|reload| fetch_cart_items
+    increase_quantity -->|reload| fetch_cart_items
+    decrease_quantity -->|reload| fetch_cart_items
+    remove_item -->|reload| fetch_cart_items
+    toggle_focus -->|reload| fetch_cart_items
+    toggle_shop_selection -->|reload| fetch_cart_items
+    toggle_select_all -->|reload| fetch_cart_items
+    delete_selected -->|reload| fetch_cart_items
+    
+    checkout_screen --> END([END])
+    
+    style START fill:#4ade80,stroke:#22c55e,stroke-width:3px,color:#000
+    style END fill:#ef4444,stroke:#dc2626,stroke-width:3px,color:#fff
+    
+    style fetch_cart_items fill:#60a5fa,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style cart_main fill:#a78bfa,stroke:#8b5cf6,stroke-width:3px,color:#fff
+    style checkout_screen fill:#f472b6,stroke:#ec4899,stroke-width:2px,color:#fff
+    
+    style add_to_cart fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style increase_quantity fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style decrease_quantity fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style remove_item fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style toggle_focus fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style toggle_shop_selection fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style toggle_select_all fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000
+    style delete_selected fill:#fbbf24,stroke:#f59e0b,stroke-width:2px,color:#000

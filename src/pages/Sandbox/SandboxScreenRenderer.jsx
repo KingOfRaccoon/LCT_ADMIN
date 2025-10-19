@@ -15,7 +15,8 @@ import {
   InputComponent,
   ColumnComponent,
   RowComponent,
-  ContainerComponent
+  ContainerComponent,
+  CardComponent
 } from './components/ScreenComponents';
 import { useBindingCache } from './hooks/useBindingCache';
 // ✅ ФАЗА 3: Импорт виртуализированного списка
@@ -397,6 +398,24 @@ const SandboxScreenRenderer = ({
         );
       }
 
+      case 'card': {
+        // Кликабельная карточка с поддержкой событий
+        return (
+          <CardComponent
+            component={component}
+            context={context}
+            iterationStack={iterationStack}
+            onEvent={onEvent}
+            isEventPending={isEventPending}
+            trackClick={trackClick}
+            activeScreenId={activeScreenId}
+            activeScreenName={activeScreenName}
+          >
+            {renderChildren(component, iterationStack)}
+          </CardComponent>
+        );
+      }
+
       case 'checkbox': {
         const label = resolveProp(props, 'label', '');
         const checked = Boolean(resolveProp(props, 'checked', false));
@@ -404,6 +423,13 @@ const SandboxScreenRenderer = ({
         const eventName = typeof rawEventName === 'string' ? rawEventName.trim() : '';
         const disabledProp = Boolean(resolveProp(props, 'disabled', false));
         const isDisabled = disabledProp || (isEventPending && eventName);
+        
+        // Резолвим eventParams с учётом iterationStack
+        const rawEventParams = props?.eventParams || {};
+        const eventParams = {};
+        for (const [key, value] of Object.entries(rawEventParams)) {
+          eventParams[key] = resolveBindingValue(value, context, undefined, { iterationStack });
+        }
         
         const handleChange = () => {
           trackClick({
@@ -417,7 +443,7 @@ const SandboxScreenRenderer = ({
           if (!eventName || typeof onEvent !== 'function') {
             return;
           }
-          onEvent(eventName);
+          onEvent(eventName, eventParams);
         };
 
         const style = mergeStyles({}, component.style);

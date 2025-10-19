@@ -59,6 +59,65 @@ export const normalizeReference = (reference) => {
   return reference.replace(/^\$\{/, '').replace(/\}$/, '');
 };
 
+/**
+ * Проверяет, является ли строка шаблонной строкой с ${} выражениями
+ * Шаблонная строка - это строка, которая содержит текст ВНЕ ${} выражений
+ * Например: "Удалить (${count})" - шаблонная строка
+ * Не шаблонная: "${product.name}" - просто биндинг
+ * @param {string} str - строка для проверки
+ * @returns {boolean}
+ */
+const isTemplateString = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  
+  // Проверяем, что строка содержит хотя бы один ${}
+  const matches = str.match(/\$\{[^}]+\}/g);
+  if (!matches || matches.length === 0) return false;
+  
+  // Если строка полностью состоит из одного ${} выражения - это не шаблонная строка
+  if (matches.length === 1) {
+    const cleaned = str.trim();
+    const match = matches[0];
+    // Проверяем, что вся строка это одно ${} выражение
+    if (cleaned === match) {
+      return false;
+    }
+  }
+  
+  // Иначе это шаблонная строка (есть текст вне ${} или несколько ${})
+  return true;
+};
+
+/**
+ * Обрабатывает шаблонную строку с несколькими ${} выражениями
+ * @param {string} template - шаблонная строка
+ * @param {object} context - контекст с переменными
+ * @param {array} iterationStack - стек итераций
+ * @returns {string}
+ */
+const processTemplateString = (template, context, iterationStack = []) => {
+  // Создаем расширенный контекст с итерациями
+  const extendedContext = { ...context };
+  iterationStack.forEach((frame) => {
+    const alias = frame.alias || 'item';
+    extendedContext[alias] = frame.item;
+    extendedContext[`${alias}Index`] = frame.index;
+    extendedContext[`${alias}Total`] = frame.total;
+  });
+  
+  // Заменяем каждое ${...} выражение на его значение
+  return template.replace(/\$\{([^}]+)\}/g, (match, expression) => {
+    try {
+      // Вычисляем каждое выражение отдельно
+      const result = safeEvalExpression(expression.trim(), extendedContext);
+      return result !== undefined && result !== null ? String(result) : '';
+    } catch (error) {
+      console.warn('[sandbox] Failed to evaluate template expression:', expression, error);
+      return match; // Возвращаем оригинальное выражение при ошибке
+    }
+  });
+};
+
 export const getContextValue = (context, path) => {
   if (!path) {
     return undefined;
@@ -199,8 +258,40 @@ export const resolveBindingValue = (value, context, fallback, options = {}) => {
   }
 
   const { iterationStack = [] } = options;
+  
+  // Проверяем, является ли это шаблонной строкой с несколькими ${} выражениями
+  // ВАЖНО: проверяем ДО нормализации, так как нормализация удаляет внешние ${}
+  // ДЛЯ ШАБЛОННЫХ СТРОК не применяем normalizeReference, так как он удалит внешние ${} и сломает внутренние
+  if (isTemplateString(value.reference)) {
+    try {
+      const result = processTemplateString(value.reference, context, iterationStack);
+      if (isSandboxDev) {
+        logger.debug('[sandbox] resolveBindingValue template string', {
+          reference: value.reference,
+          result
+        });
+      }
+      return result;
+    } catch (error) {
+      console.warn('[sandbox] Failed to process template string:', value.reference, error);
+    }
+  }
+  
   const normalized = normalizeReference(value.reference);
-  const iterationLookup = normalized
+  
+  // Проверяем, содержит ли биндинг Python-синтаксис (str(), in, if/else)
+  const hasPythonSyntax = /\b(str|len)\(|if\s+.+\s+else\s+|\s+in\s+/.test(normalized);
+  
+  // Проверяем, содержит ли биндинг JavaScript выражение (не просто путь к переменной)
+  // Это НЕ простой путь, если содержит:
+  // - Операторы: +, -, *, /, %, &&, ||, ===, !==, ==, !=, >, <, >=, <=
+  // - Тернарный оператор: ? :
+  // - Строковые литералы: 'text' или "text"
+  // - Скобки: ( )
+  const hasJsExpression = /[+\-*/%()]|&&|\|\||[!=]==?|[<>]=?|\?.*:|['"]/.test(normalized);
+  
+  // Если это выражение - не ищем в iteration, а сразу вычисляем
+  const iterationLookup = (normalized && !hasPythonSyntax && !hasJsExpression)
     ? resolveIterationReference(normalized, iterationStack)
     : { found: false, value: undefined };
 
@@ -222,15 +313,15 @@ export const resolveBindingValue = (value, context, fallback, options = {}) => {
       }
       return iterationLookup.value;
     }
-  } else if (normalized) {
-    // Проверяем, содержит ли биндинг Python-синтаксис (str(), in, if/else)
-    const hasPythonSyntax = /\b(str|len)\(|if\s+.+\s+else\s+|\s+in\s+/.test(normalized);
+  }
+  
+  if (normalized) {
     
-    if (hasPythonSyntax) {
-      // Транспилируем Python → JS и вычисляем
+    if (hasPythonSyntax || hasJsExpression) {
+      // Если есть Python синтаксис - транспилируем, иначе используем как JS
+      const jsExpression = hasPythonSyntax ? transpilePythonToJs(normalized) : normalized;
+      
       try {
-        const jsExpression = transpilePythonToJs(normalized);
-        
         // Создаем расширенный контекст с итерациями
         const extendedContext = { ...context };
         iterationStack.forEach((frame) => {
@@ -243,9 +334,11 @@ export const resolveBindingValue = (value, context, fallback, options = {}) => {
         const resolved = safeEvalExpression(jsExpression, extendedContext);
         
         if (isSandboxDev) {
-          logger.debug('[sandbox] resolveBindingValue python', {
+          logger.debug('[sandbox] resolveBindingValue expression', {
             reference: value.reference,
             normalized,
+            hasPythonSyntax,
+            hasJsExpression,
             jsExpression,
             resolved
           });
@@ -255,7 +348,7 @@ export const resolveBindingValue = (value, context, fallback, options = {}) => {
           return resolved;
         }
       } catch (error) {
-        console.warn('[sandbox] Failed to transpile Python expression:', normalized, error);
+        console.warn('[sandbox] Failed to evaluate expression:', normalized, error);
       }
     }
     

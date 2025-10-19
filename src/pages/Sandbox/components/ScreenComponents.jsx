@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { resolveBindingValue } from '../utils/bindings';
 
 /**
@@ -32,7 +32,16 @@ export const ButtonComponent = React.memo(({
   const disabled = Boolean(resolveBindingValue(props?.disabled, context, false, { iterationStack }));
   
   const eventName = typeof props?.event === 'string' ? props.event.trim() : '';
-  const eventParams = props?.eventParams || {};
+  const rawEventParams = props?.eventParams || {};
+  
+  // Резолвим eventParams с учётом iterationStack
+  const eventParams = useMemo(() => {
+    const resolved = {};
+    for (const [key, value] of Object.entries(rawEventParams)) {
+      resolved[key] = resolveBindingValue(value, context, undefined, { iterationStack });
+    }
+    return resolved;
+  }, [rawEventParams, context, iterationStack]);
   
   const handleClick = useCallback(() => {
     trackClick({
@@ -363,3 +372,78 @@ export const ContainerComponent = React.memo(({
 });
 
 ContainerComponent.displayName = 'ContainerComponent';
+
+// ============================================================================
+// Card Component
+// ============================================================================
+
+export const CardComponent = React.memo(({
+  component,
+  context,
+  iterationStack = [],
+  onEvent,
+  isEventPending,
+  trackClick,
+  activeScreenId,
+  activeScreenName,
+  children
+}) => {
+  const props = component?.props ?? component?.properties ?? {};
+  
+  const eventName = typeof props?.event === 'string' ? props.event.trim() : '';
+  const rawEventParams = props?.eventParams || {};
+  
+  // Резолвим eventParams с учётом iterationStack
+  const eventParams = useMemo(() => {
+    const resolved = {};
+    for (const [key, value] of Object.entries(rawEventParams)) {
+      resolved[key] = resolveBindingValue(value, context, undefined, { iterationStack });
+    }
+    return resolved;
+  }, [rawEventParams, context, iterationStack]);
+  
+  const handleClick = useCallback(() => {
+    trackClick({
+      componentId: component.id,
+      componentType: component.type,
+      screenId: activeScreenId,
+      screenName: activeScreenName,
+      label: component.id || 'card',
+      eventName: eventName || null
+    });
+    
+    if (eventName && typeof onEvent === 'function') {
+      onEvent(eventName, eventParams);
+    }
+  }, [component.id, component.type, eventName, JSON.stringify(eventParams), onEvent, trackClick, activeScreenId, activeScreenName]);
+  
+  const isDisabled = isEventPending && eventName;
+  
+  return (
+    <div
+      className="canvas-card"
+      style={{
+        ...component.style,
+        cursor: eventName ? 'pointer' : component.style?.cursor,
+        pointerEvents: isDisabled ? 'none' : 'auto',
+        opacity: isDisabled ? 0.6 : component.style?.opacity
+      }}
+      onClick={eventName ? handleClick : undefined}
+      data-event={eventName || undefined}
+    >
+      {children}
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.component.id === nextProps.component.id &&
+    prevProps.component.style === nextProps.component.style &&
+    JSON.stringify(prevProps.component.props) === JSON.stringify(nextProps.component.props) &&
+    prevProps.context === nextProps.context &&
+    prevProps.iterationStack === nextProps.iterationStack &&
+    prevProps.isEventPending === nextProps.isEventPending &&
+    prevProps.children === nextProps.children
+  );
+});
+
+CardComponent.displayName = 'CardComponent';

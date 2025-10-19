@@ -48,6 +48,13 @@
     "suggested_products": {
       "type": "array",
       "schema": []
+    },
+    "removed_item": {
+      "type": "object",
+      "schema": {
+        "id": "number",
+        "quantity": "number"
+      }
     }
   },
   "initialContext": {
@@ -82,6 +89,7 @@
         "image": "https://via.placeholder.com/80"
       }
     ],
+    "removed_item": null,
     "ui": {
       "ready": false,
       "notifications": {
@@ -166,7 +174,21 @@
           "event": "removeItem",
           "keepInputs": true,
           "summary": "Удаление товара из корзины",
-          "target": "remove-item-integration",
+          "target": "prepare-remove-item",
+          "contextPatch": {
+            "selected_item_id": {
+              "reference": "${eventParams.selected_item_id}",
+              "value": null
+            }
+          }
+        },
+        {
+          "id": "edge-undo-remove-item",
+          "label": "Отменить удаление",
+          "event": "undoRemoveItem",
+          "keepInputs": true,
+          "summary": "Возврат удалённого товара в корзину",
+          "target": "undo-remove-item-integration",
           "contextPatch": {}
         },
         {
@@ -287,6 +309,72 @@
       "edges": []
     },
     {
+      "id": "prepare-remove-item",
+      "label": "Подготовка к удалению товара",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Сохраняет информацию об удаляемом товаре перед удалением",
+      "expressions": [
+        {
+          "variable": "removed_item",
+          "url": "",
+          "params": {},
+          "method": "expression",
+          "body": "${(() => { const item = cart_response.shop_groups.flatMap(shop => shop.items).find(i => i.advertisement_id === selected_item_id); return item ? { id: item.advertisement_id, quantity: item.quantity } : null; })()}",
+          "metadata": {
+            "description": "Находит и сохраняет ID и количество удаляемого товара",
+            "category": "data",
+            "tags": ["cart", "delete", "state"]
+          }
+        },
+        {
+          "variable": "ui.notifications.message",
+          "url": "",
+          "params": {},
+          "method": "expression",
+          "body": "Товар удалён из корзины",
+          "metadata": {
+            "description": "Устанавливает текст уведомления",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        },
+        {
+          "variable": "ui.notifications.actionLabel",
+          "url": "",
+          "params": {},
+          "method": "expression",
+          "body": "Вернуть",
+          "metadata": {
+            "description": "Устанавливает текст кнопки действия",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        },
+        {
+          "variable": "ui.notifications.actionEvent",
+          "url": "",
+          "params": {},
+          "method": "expression",
+          "body": "undoRemoveItem",
+          "metadata": {
+            "description": "Устанавливает событие для кнопки действия",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "removed_item",
+          "case": null,
+          "state_id": "remove-item-integration"
+        }
+      ],
+      "edges": []
+    },
+    {
       "id": "remove-item-integration",
       "label": "Удаление товара",
       "type": "integration",
@@ -309,6 +397,96 @@
       "transitions": [
         {
           "variable": "add_to_cart_response",
+          "case": null,
+          "state_id": "fetch-cart-items"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "undo-remove-item-integration",
+      "label": "Отмена удаления товара",
+      "type": "integration",
+      "state_type": "integration",
+      "start": false,
+      "description": "PATCH-запрос для возврата удалённого товара в корзину",
+      "expressions": [
+        {
+          "variable": "add_to_cart_response",
+          "url": "https://sandkittens.me/backservices/api/carts/3/items/${removed_item.id}",
+          "params": {},
+          "method": "patch",
+          "body": {
+            "quantity": "${removed_item.quantity}"
+          },
+          "metadata": {
+            "description": "Возвращает удалённый товар в корзину с исходным количеством",
+            "category": "data",
+            "tags": ["integration", "api", "cart", "undo"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "add_to_cart_response",
+          "case": null,
+          "state_id": "clear-undo-state"
+        }
+      ],
+      "edges": []
+    },
+    {
+      "id": "clear-undo-state",
+      "label": "Очистка состояния отмены",
+      "type": "technical",
+      "state_type": "technical",
+      "start": false,
+      "description": "Очищает переменные snackbar и removed_item после восстановления товара",
+      "expressions": [
+        {
+          "variable": "ui.notifications.message",
+          "expression": "null",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Скрывает уведомление",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        },
+        {
+          "variable": "ui.notifications.actionLabel",
+          "expression": "null",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Очищает текст кнопки действия",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        },
+        {
+          "variable": "ui.notifications.actionEvent",
+          "expression": "null",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Очищает событие кнопки действия",
+            "category": "ui",
+            "tags": ["notification"]
+          }
+        },
+        {
+          "variable": "removed_item",
+          "expression": "null",
+          "dependent_variables": [],
+          "metadata": {
+            "description": "Очищает информацию об удалённом товаре",
+            "category": "data",
+            "tags": ["cart", "state"]
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "variable": "removed_item",
           "case": null,
           "state_id": "fetch-cart-items"
         }
@@ -835,7 +1013,7 @@
                                               "type": "text",
                                               "properties": {
                                                 "content": {
-                                                  "reference": "${product.price} ₽",
+                                                  "reference": "${product.price * product.quantity} ₽",
                                                   "value": "0 ₽"
                                                 },
                                                 "variant": "body"
@@ -1296,89 +1474,105 @@
                   ]
                 }
               ]
-            },
+            }
+          ]
+        }
+      ]
+    },
+    "snackbar": {
+      "id": "section-cart-snackbar",
+      "type": "Section",
+      "properties": {
+        "slot": "snackbar",
+        "padding": 0,
+        "spacing": 0
+      },
+      "style": {
+        "position": "fixed",
+        "bottom": "90px",
+        "left": "0",
+        "right": "0",
+        "zIndex": 1000,
+        "pointerEvents": "none"
+      },
+      "children": [
+        {
+          "id": "conditional-snackbar",
+          "type": "conditional",
+          "properties": {
+            "condition": {
+              "reference": "${ui.notifications.message !== null}",
+              "value": false
+            }
+          },
+          "children": [
             {
-              "id": "conditional-snackbar",
-              "type": "conditional",
+              "id": "snackbar-notification",
+              "type": "row",
               "properties": {
-                "condition": {
-                  "reference": "${ui.notifications.message !== null}",
-                  "value": false
-                }
+                "spacing": 12,
+                "alignItems": "center",
+                "justifyContent": "space-between",
+                "padding": 16
+              },
+              "style": {
+                "margin": "0 16px",
+                "backgroundColor": "#2F3034",
+                "borderRadius": "12px",
+                "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.15)",
+                "pointerEvents": "auto"
               },
               "children": [
                 {
-                  "id": "snackbar-notification",
-                  "type": "row",
+                  "id": "text-snackbar-message",
+                  "type": "text",
                   "properties": {
-                    "spacing": 12,
-                    "alignItems": "center",
-                    "justifyContent": "space-between",
-                    "padding": 16
+                    "content": {
+                      "reference": "${ui.notifications.message}",
+                      "value": "Уведомление"
+                    },
+                    "variant": "body"
                   },
                   "style": {
-                    "position": "fixed",
-                    "bottom": "90px",
-                    "left": "16px",
-                    "right": "16px",
-                    "backgroundColor": "#2F3034",
-                    "borderRadius": "12px",
-                    "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.15)",
-                    "zIndex": 1000
+                    "fontSize": "15px",
+                    "fontWeight": 400,
+                    "color": "#ffffff",
+                    "flex": 1
+                  }
+                },
+                {
+                  "id": "conditional-snackbar-action",
+                  "type": "conditional",
+                  "properties": {
+                    "condition": {
+                      "reference": "${ui.notifications.actionLabel !== null}",
+                      "value": false
+                    }
                   },
                   "children": [
                     {
-                      "id": "text-snackbar-message",
-                      "type": "text",
+                      "id": "button-snackbar-action",
+                      "type": "button",
                       "properties": {
-                        "content": {
-                          "reference": "${ui.notifications.message}",
-                          "value": "Уведомление"
+                        "text": {
+                          "reference": "${ui.notifications.actionLabel}",
+                          "value": "Действие"
                         },
-                        "variant": "body"
+                        "variant": "link",
+                        "event": {
+                          "reference": "${ui.notifications.actionEvent}",
+                          "value": "snackbarAction"
+                        }
                       },
                       "style": {
                         "fontSize": "15px",
-                        "fontWeight": 400,
-                        "color": "#ffffff",
-                        "flex": 1
+                        "fontWeight": 600,
+                        "color": "#8B5CF6",
+                        "background": "transparent",
+                        "border": "none",
+                        "cursor": "pointer",
+                        "padding": "0"
                       }
-                    },
-                    {
-                      "id": "conditional-snackbar-action",
-                      "type": "conditional",
-                      "properties": {
-                        "condition": {
-                          "reference": "${ui.notifications.actionLabel !== null}",
-                          "value": false
-                        }
-                      },
-                      "children": [
-                        {
-                          "id": "button-snackbar-action",
-                          "type": "button",
-                          "properties": {
-                            "text": {
-                              "reference": "${ui.notifications.actionLabel}",
-                              "value": "Действие"
-                            },
-                            "variant": "link",
-                            "event": {
-                              "reference": "${ui.notifications.actionEvent}",
-                              "value": "snackbarAction"
-                            }
-                          },
-                          "style": {
-                            "fontSize": "15px",
-                            "fontWeight": 600,
-                            "color": "#8B5CF6",
-                            "background": "transparent",
-                            "border": "none",
-                            "cursor": "pointer",
-                            "padding": "0"
-                          }
-                        }
-                      ]
                     }
                   ]
                 }

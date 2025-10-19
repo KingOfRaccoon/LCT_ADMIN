@@ -324,13 +324,18 @@ const hydrateGraphNodes = (nodes = [], handlers = {}, fullGraphData = null) => {
 
     return {
       ...node,
-      data
+      data,
+      // Добавляем position для горизонтального графа
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left
     };
   });
 };
 
 const hydrateGraphEdges = (edges = []) => {
-  return edges.map((edge) => {
+  console.log('[hydrateGraphEdges] Input edges:', edges);
+  
+  const result = edges.map((edge) => {
     const data = edge.data ? { ...edge.data } : {};
     
     // Нормализация: используем name если label не задан
@@ -364,6 +369,9 @@ const hydrateGraphEdges = (edges = []) => {
       }
     };
   });
+  
+  console.log('[hydrateGraphEdges] Output edges:', result);
+  return result;
 };
 
 const buildDefaultGraph = (handleNodeLabelChange, handleNodeConfigChange, handleNodeExecute) => {
@@ -421,14 +429,14 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const getEdgeStyle = () => {
     switch (transitionType) {
       case 'success':
-        return { borderColor: '#10b981', backgroundColor: '#d1fae5', textColor: '#065f46' };
+        return { borderColor: '#10b981', backgroundColor: '#d1fae5', textColor: '#065f46', strokeColor: '#10b981' };
       case 'error':
-        return { borderColor: '#ef4444', backgroundColor: '#fee2e2', textColor: '#991b1b' };
+        return { borderColor: '#ef4444', backgroundColor: '#fee2e2', textColor: '#991b1b', strokeColor: '#ef4444' };
       case 'conditional':
-        return { borderColor: '#f59e0b', backgroundColor: '#fef3c7', textColor: '#92400e' };
+        return { borderColor: '#f59e0b', backgroundColor: '#fef3c7', textColor: '#92400e', strokeColor: '#f59e0b' };
       case 'default':
       default:
-        return { borderColor: '#3b82f6', backgroundColor: '#dbeafe', textColor: '#1e40af' };
+        return { borderColor: '#3b82f6', backgroundColor: '#dbeafe', textColor: '#1e40af', strokeColor: '#3b82f6' };
     }
   };
 
@@ -436,6 +444,9 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const hasCondition = condition && typeof condition === 'string' && condition.trim();
   const hasDescription = description && typeof description === 'string' && description.trim();
   const displayLabel = transitionName || trigger;
+  
+  // Определяем, является ли триггер значимым событием
+  const hasMeaningfulTrigger = trigger && trigger !== 'auto' && trigger !== displayLabel;
 
   return (
     <>
@@ -445,8 +456,8 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
         markerEnd={markerEnd} 
         style={{ 
           ...style, 
-          stroke: edgeStyle.borderColor, 
-          strokeWidth: 2 
+          stroke: edgeStyle.strokeColor, 
+          strokeWidth: 2.5
         }} 
       />
       <EdgeLabelRenderer>
@@ -455,49 +466,63 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, ta
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             background: 'white',
-            padding: '8px 12px',
-            borderRadius: '8px',
+            padding: '10px 14px',
+            borderRadius: '10px',
             fontSize: 12,
             fontWeight: 500,
-            border: `2px solid ${edgeStyle.borderColor}`,
+            border: `2.5px solid ${edgeStyle.borderColor}`,
             color: '#1e293b',
             pointerEvents: 'all',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            maxWidth: '280px',
-            minWidth: '120px',
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)',
+            maxWidth: '300px',
+            minWidth: '140px',
           }}
           className="nodrag nopan edge-label-card"
         >
-          {/* Название перехода */}
+          {/* Название перехода с иконкой события */}
           <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
             fontWeight: 700, 
             color: edgeStyle.textColor, 
-            marginBottom: (hasCondition || hasDescription || trigger !== 'auto') ? '6px' : 0,
-            fontSize: 13,
+            marginBottom: (hasMeaningfulTrigger || hasCondition || hasDescription) ? '8px' : 0,
+            fontSize: 14,
             letterSpacing: '0.3px'
           }}>
-            {displayLabel}
+            <ArrowRight size={16} strokeWidth={2.5} />
+            <span>{displayLabel}</span>
           </div>
 
-          {/* Триггер/событие */}
-          {trigger && trigger !== 'auto' && trigger !== displayLabel && (
+          {/* Триггер/событие - более заметный */}
+          {hasMeaningfulTrigger && (
             <div style={{ 
-              fontSize: 10, 
-              color: '#64748b',
-              marginBottom: (hasCondition || hasDescription) ? '4px' : 0,
+              fontSize: 11, 
+              color: '#475569',
+              marginBottom: (hasCondition || hasDescription) ? '6px' : 0,
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '6px',
+              padding: '6px 8px',
+              background: edgeStyle.backgroundColor,
+              borderRadius: '6px',
+              border: `1px solid ${edgeStyle.borderColor}`
             }}>
-              <span style={{ 
-                background: edgeStyle.backgroundColor, 
+              <Send size={12} strokeWidth={2} style={{ color: edgeStyle.textColor }} />
+              <span style={{ fontWeight: 600, color: edgeStyle.textColor }}>
+                Событие:
+              </span>
+              <code style={{ 
+                background: 'white',
                 padding: '2px 6px', 
                 borderRadius: '4px',
                 fontWeight: 600,
-                color: edgeStyle.textColor
+                color: edgeStyle.textColor,
+                fontFamily: 'Menlo, Monaco, monospace',
+                fontSize: 10
               }}>
                 {trigger}
-              </span>
+              </code>
             </div>
           )}
 
@@ -1077,6 +1102,35 @@ const NODE_DIMENSIONS = {
 
 const getNodeDimensions = (node) => NODE_DIMENSIONS[node.type] || NODE_DIMENSIONS.default;
 
+const DEFAULT_LAYOUT_SPACING = {
+  nodesep: 200,
+  ranksep: 220
+};
+
+// Adjust dagre spacing dynamically to preserve comfortable gaps between varied node footprints.
+const calculateLayoutSpacing = (nodes) => {
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    return DEFAULT_LAYOUT_SPACING;
+  }
+
+  const metrics = nodes.reduce((acc, node) => {
+    const { width, height } = getNodeDimensions(node);
+    return {
+      maxWidth: Math.max(acc.maxWidth, width),
+      maxHeight: Math.max(acc.maxHeight, height),
+      totalWidth: acc.totalWidth + width,
+      count: acc.count + 1
+    };
+  }, { maxWidth: 0, maxHeight: 0, totalWidth: 0, count: 0 });
+
+  const averageWidth = metrics.count > 0 ? metrics.totalWidth / metrics.count : DEFAULT_LAYOUT_SPACING.nodesep;
+
+  return {
+    nodesep: Math.max(DEFAULT_LAYOUT_SPACING.nodesep, averageWidth + 120),
+    ranksep: Math.max(DEFAULT_LAYOUT_SPACING.ranksep, metrics.maxHeight + 140)
+  };
+};
+
 const deriveSchemaType = (schemaMeta) => {
   if (!schemaMeta) {
     return 'string';
@@ -1144,7 +1198,8 @@ const isPlainObject = (value) => (
 
 const getLayoutedElements = (nodes = [], edges = []) => {
   const graph = new dagre.graphlib.Graph();
-  graph.setGraph({ rankdir: 'LR', nodesep: 120, ranksep: 160, marginx: 24, marginy: 24 });
+  const { nodesep, ranksep } = calculateLayoutSpacing(nodes);
+  graph.setGraph({ rankdir: 'LR', nodesep, ranksep, marginx: 48, marginy: 64 });
   graph.setDefaultEdgeLabel(() => ({}));
 
   nodes.forEach((node) => {
@@ -1153,7 +1208,7 @@ const getLayoutedElements = (nodes = [], edges = []) => {
   });
 
   edges.forEach((edge) => {
-    graph.setEdge(edge.source, edge.target);
+    graph.setEdge(edge.source, edge.target, { minlen: 2 });
   });
 
   dagre.layout(graph);
@@ -2239,8 +2294,12 @@ const ScreenEditor = () => {
         // Если нет данных в VirtualContext, загружаем дефолтный граф из JSON-файла
         console.log('[ScreenEditor] Loading default graph from JSON file');
         const graphJson = await import('../../data/defaultGraphTemplate.json');
+        console.log('[ScreenEditor] Loaded graphJson:', graphJson);
+        
         const storedNodes = Array.isArray(graphJson.nodes) ? graphJson.nodes : [];
         const storedEdges = Array.isArray(graphJson.edges) ? graphJson.edges : [];
+        
+        console.log('[ScreenEditor] storedNodes:', storedNodes.length, 'storedEdges:', storedEdges.length);
 
         const hydratedNodes = hydrateGraphNodes(storedNodes, {
           onLabelChange: labelChangeRef.current ?? handleNodeLabelChange,
@@ -2249,6 +2308,8 @@ const ScreenEditor = () => {
         }, graphJson);
         
         const hydratedEdges = hydrateGraphEdges(storedEdges);
+
+        console.log('[ScreenEditor] Setting nodes:', hydratedNodes.length, 'edges:', hydratedEdges.length);
 
         if (!cancelled) {
           setNodes(hydratedNodes);
@@ -2349,18 +2410,33 @@ const ScreenEditor = () => {
   // Edge Management
   const onConnect = useCallback(
     (params) => {
+      // Получаем информацию об узлах-источниках и целях
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const targetNode = nodes.find(n => n.id === params.target);
+      
+      // Генерируем осмысленное имя перехода на основе узлов
+      const sourceLabel = sourceNode?.data?.label || 'Unknown';
+      const targetLabel = targetNode?.data?.label || 'Unknown';
+      const transitionName = `${sourceLabel} → ${targetLabel}`;
+      
       const newEdge = {
         ...params,
         type: 'custom',
         markerEnd: { type: MarkerType.ArrowClosed },
-        data: { trigger: 'onClick' },
-        label: 'New Transition'
+        data: { 
+          name: transitionName,
+          trigger: 'onClick',
+          event: 'onClick',
+          type: 'default',
+          description: `Переход от "${sourceLabel}" к "${targetLabel}"`
+        },
+        label: transitionName
       };
       
       setEdges((eds) => addEdge(newEdge, eds));
-      toast.success('Connection created!');
+      toast.success('Переход создан');
     },
-    [setEdges]
+    [setEdges, nodes]
   );
 
   // Validation System
@@ -3150,53 +3226,100 @@ const ScreenEditor = () => {
             </div>
           ) : selectedEdge ? (
             <div className="edge-properties">
-              <h4>Connection</h4>
+              <h4>Свойства перехода</h4>
               
               <div className="property-group">
-                <label>Label</label>
+                <label>Название перехода</label>
                 <input 
                   type="text"
                   value={selectedEdge.label || ''}
                   onChange={(e) => {
                     const updatedEdge = {
                       ...selectedEdge,
-                      label: e.target.value
+                      label: e.target.value,
+                      data: {
+                        ...selectedEdge.data,
+                        name: e.target.value
+                      }
                     };
                     setSelectedEdge(updatedEdge);
                     setEdges(eds => eds.map(e => e.id === selectedEdge.id ? updatedEdge : e));
                   }}
-                  placeholder="Transition label"
+                  placeholder="Например: Добавить в корзину"
                 />
               </div>
 
               <div className="property-group">
-                <label>Trigger</label>
-                <select 
-                  value={selectedEdge.data?.trigger || 'onClick'}
+                <label>Событие (Event)</label>
+                <input 
+                  type="text"
+                  value={selectedEdge.data?.event || selectedEdge.data?.trigger || 'onClick'}
                   onChange={(e) => {
                     const updatedEdge = {
                       ...selectedEdge,
                       data: {
                         ...selectedEdge.data,
+                        event: e.target.value,
                         trigger: e.target.value
                       }
                     };
                     setSelectedEdge(updatedEdge);
                     setEdges(eds => eds.map(e => e.id === selectedEdge.id ? updatedEdge : e));
                   }}
+                  placeholder="onClick, onSubmit, onSuccess..."
+                />
+                <small style={{ color: '#64748b', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  Стандартные события: onClick, onSubmit, onSuccess, onError, onLoad, onClose
+                </small>
+              </div>
+
+              <div className="property-group">
+                <label>Тип перехода</label>
+                <select 
+                  value={selectedEdge.data?.type || 'default'}
+                  onChange={(e) => {
+                    const updatedEdge = {
+                      ...selectedEdge,
+                      data: {
+                        ...selectedEdge.data,
+                        type: e.target.value
+                      }
+                    };
+                    setSelectedEdge(updatedEdge);
+                    setEdges(eds => eds.map(e => e.id === selectedEdge.id ? updatedEdge : e));
+                  }}
                 >
-                  <option value="onClick">On Click</option>
-                  <option value="onSubmit">On Submit</option>
-                  <option value="onSuccess">On Success</option>
-                  <option value="onError">On Error</option>
-                  <option value="onLoad">On Load</option>
+                  <option value="default">Обычный</option>
+                  <option value="success">Успех</option>
+                  <option value="error">Ошибка</option>
+                  <option value="conditional">Условный</option>
                 </select>
               </div>
 
               <div className="property-group">
-                <label>Condition</label>
+                <label>Описание</label>
                 <textarea 
-                  placeholder="Optional condition logic"
+                  placeholder="Описание перехода (опционально)"
+                  value={selectedEdge.data?.description || ''}
+                  onChange={(e) => {
+                    const updatedEdge = {
+                      ...selectedEdge,
+                      data: {
+                        ...selectedEdge.data,
+                        description: e.target.value
+                      }
+                    };
+                    setSelectedEdge(updatedEdge);
+                    setEdges(eds => eds.map(e => e.id === selectedEdge.id ? updatedEdge : e));
+                  }}
+                  rows={2}
+                />
+              </div>
+
+              <div className="property-group">
+                <label>Условие (Condition)</label>
+                <textarea 
+                  placeholder="Условие для перехода (опционально), например: context.cart.length > 0"
                   value={selectedEdge.data?.condition || ''}
                   onChange={(e) => {
                     const updatedEdge = {
@@ -3212,10 +3335,24 @@ const ScreenEditor = () => {
                   rows={3}
                 />
               </div>
+
+              <div className="property-actions">
+                <button
+                  className="btn-danger"
+                  onClick={() => {
+                    setEdges(eds => eds.filter(e => e.id !== selectedEdge.id));
+                    setSelectedEdge(null);
+                    toast.success('Переход удалён');
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Удалить переход
+                </button>
+              </div>
             </div>
           ) : (
             <div className="no-selection">
-              <p>Select a node or connection to edit properties</p>
+              <p>Выберите узел или переход для редактирования</p>
             </div>
           )}
 

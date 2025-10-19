@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -17,6 +17,7 @@ import {
   deleteProduct as deleteProductApi,
   getProductById as getProductByIdApi
 } from '../../services/productApi.js';
+import { SmartList } from '../Sandbox/components/VirtualizedList';
 import './ProductList.css';
 
 const DEFAULT_VERSION = '1.0.0';
@@ -345,6 +346,124 @@ const ProductList = () => {
     }
   };
 
+  // Render product card for virtualization
+  const renderProductCard = useCallback(({ index, data }) => {
+    const product = data;
+    return (
+      <div className="product-card">
+        <div className="card-header">
+          <div className="card-title">
+            <h3>
+              {product.name}
+              {product.badge && (
+                <span className="product-badge">{product.badge}</span>
+              )}
+            </h3>
+            {getStatusBadge(product)}
+          </div>
+          
+          <div className="card-actions">
+            <button
+              className="action-btn"
+              onClick={() => handleEditProduct(product)}
+            >
+              <Edit size={16} />
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => handleDuplicateProduct(product)}
+            >
+              <Copy size={16} />
+            </button>
+            <button
+              className="action-btn danger"
+              onClick={() => handleDeleteProduct(product)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="card-content">
+          <p className="card-description">{product.description}</p>
+          
+          <div className="card-stats">
+            <div className="stat">
+              <span className="stat-value">{product.screens}</span>
+              <span className="stat-label">Screens</span>
+            </div>
+            <div className="stat">
+              <span className="stat-value">{product.actions}</span>
+              <span className="stat-label">Actions</span>
+            </div>
+            <div className="stat">
+              <span className="stat-value">v{product.version}</span>
+              <span className="stat-label">Version</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-footer">
+          <span className="last-modified">
+            Modified {formatDate(product.lastModified)}
+          </span>
+          <Link
+            to={`/products/${product.id}`}
+            className="btn btn-secondary btn-sm"
+            onClick={() => handleEditProduct(product, { skipNavigate: true })}
+          >
+            Open
+          </Link>
+        </div>
+      </div>
+    );
+  }, []);
+
+  // Render product row for virtualization
+  const renderProductRow = useCallback(({ index, data }) => {
+    const product = data;
+    return (
+      <tr>
+        <td>
+          <Link
+            to={`/products/${product.id}`}
+            className="product-name-link"
+            onClick={() => handleEditProduct(product, { skipNavigate: true })}
+          >
+            {product.name}
+          </Link>
+        </td>
+        <td className="description-cell">{product.description}</td>
+        <td>{getStatusBadge(product)}</td>
+        <td>v{product.version}</td>
+        <td>{product.screens}</td>
+        <td>{formatDate(product.lastModified)}</td>
+        <td>
+          <div className="table-actions">
+            <button
+              className="action-btn"
+              onClick={() => handleEditProduct(product)}
+            >
+              <Edit size={16} />
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => handleDuplicateProduct(product)}
+            >
+              <Copy size={16} />
+            </button>
+            <button
+              className="action-btn danger"
+              onClick={() => handleDeleteProduct(product)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }, []);
+
   if (loading) {
     return (
       <div className="product-list-page">
@@ -432,79 +551,17 @@ const ProductList = () => {
       ) : (
         <div className={`products-container ${viewMode}`}>
           {viewMode === 'grid' ? (
-            // Grid View
-            <div className="products-grid">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="product-card">
-                  <div className="card-header">
-                    <div className="card-title">
-                      <h3>
-                        {product.name}
-                        {product.badge && (
-                          <span className="product-badge">{product.badge}</span>
-                        )}
-                      </h3>
-                      {getStatusBadge(product)}
-                    </div>
-                    
-                    <div className="card-actions">
-                      <button
-                        className="action-btn"
-                        onClick={() => handleEditProduct(product)}
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        className="action-btn"
-                        onClick={() => handleDuplicateProduct(product)}
-                      >
-                        <Copy size={16} />
-                      </button>
-                      <button
-                        className="action-btn danger"
-                        onClick={() => handleDeleteProduct(product)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="card-content">
-                    <p className="card-description">{product.description}</p>
-                    
-                    <div className="card-stats">
-                      <div className="stat">
-                        <span className="stat-value">{product.screens}</span>
-                        <span className="stat-label">Screens</span>
-                      </div>
-                      <div className="stat">
-                        <span className="stat-value">{product.actions}</span>
-                        <span className="stat-label">Actions</span>
-                      </div>
-                      <div className="stat">
-                        <span className="stat-value">v{product.version}</span>
-                        <span className="stat-label">Version</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="card-footer">
-                    <span className="last-modified">
-                      Modified {formatDate(product.lastModified)}
-                    </span>
-                    <Link
-                      to={`/products/${product.id}`}
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleEditProduct(product, { skipNavigate: true })}
-                    >
-                      Open
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
+            // Grid View with Virtualization
+            <SmartList
+              items={filteredProducts}
+              renderItem={renderProductCard}
+              itemHeight={280}
+              height={Math.min(window.innerHeight - 300, 800)}
+              className="products-grid virtualized"
+              itemKey={(index, item) => item.id}
+            />
           ) : (
-            // Table View
+            // Table View with Virtualization
             <div className="products-table">
               <table>
                 <thead>
@@ -518,49 +575,15 @@ const ProductList = () => {
                     <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredProducts.map(product => (
-                    <tr key={product.id}>
-                      <td>
-                        <Link
-                          to={`/products/${product.id}`}
-                          className="product-name-link"
-                          onClick={() => handleEditProduct(product, { skipNavigate: true })}
-                        >
-                          {product.name}
-                        </Link>
-                      </td>
-                      <td className="description-cell">{product.description}</td>
-                      <td>{getStatusBadge(product)}</td>
-                      <td>v{product.version}</td>
-                      <td>{product.screens}</td>
-                      <td>{formatDate(product.lastModified)}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            className="action-btn"
-                            onClick={() => handleEditProduct(product)}
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            className="action-btn"
-                            onClick={() => handleDuplicateProduct(product)}
-                          >
-                            <Copy size={16} />
-                          </button>
-                          <button
-                            className="action-btn danger"
-                            onClick={() => handleDeleteProduct(product)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
               </table>
+              <SmartList
+                items={filteredProducts}
+                renderItem={renderProductRow}
+                itemHeight={60}
+                height={Math.min(window.innerHeight - 350, 700)}
+                className="virtualized-tbody"
+                itemKey={(index, item) => item.id}
+              />
             </div>
           )}
         </div>

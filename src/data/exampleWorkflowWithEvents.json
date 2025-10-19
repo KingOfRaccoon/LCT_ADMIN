@@ -1,0 +1,254 @@
+{
+  "nodes": [
+    {
+      "id": "screen-home",
+      "type": "screen",
+      "position": { "x": 100, "y": 200 },
+      "data": {
+        "label": "Главный экран",
+        "screenId": "home",
+        "description": "Начальный экран приложения",
+        "inputBindings": [],
+        "outputBindings": [
+          { "name": "selectedProduct", "variable": "context.product" }
+        ]
+      }
+    },
+    {
+      "id": "action-load-products",
+      "type": "action",
+      "position": { "x": 400, "y": 200 },
+      "data": {
+        "label": "Загрузка продуктов",
+        "actionType": "api",
+        "config": {
+          "endpoint": "/api/products",
+          "method": "GET",
+          "contextKey": "productsList"
+        },
+        "inputBindings": [],
+        "outputBindings": [
+          { "name": "products", "variable": "context.productsList" }
+        ]
+      }
+    },
+    {
+      "id": "screen-product-list",
+      "type": "screen",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "label": "Список продуктов",
+        "screenId": "product-list",
+        "description": "Отображение списка продуктов",
+        "inputBindings": [
+          { "name": "products", "variable": "context.productsList" }
+        ],
+        "outputBindings": [
+          { "name": "selectedProduct", "variable": "context.selectedProduct" }
+        ]
+      }
+    },
+    {
+      "id": "screen-error",
+      "type": "screen",
+      "position": { "x": 700, "y": 300 },
+      "data": {
+        "label": "Экран ошибки",
+        "screenId": "error",
+        "description": "Отображение ошибки загрузки",
+        "inputBindings": [
+          { "name": "error", "variable": "context.error" }
+        ],
+        "outputBindings": []
+      }
+    },
+    {
+      "id": "screen-product-detail",
+      "type": "screen",
+      "position": { "x": 1000, "y": 100 },
+      "data": {
+        "label": "Детали продукта",
+        "screenId": "product-detail",
+        "description": "Подробная информация о продукте",
+        "inputBindings": [
+          { "name": "product", "variable": "context.selectedProduct" }
+        ],
+        "outputBindings": []
+      }
+    },
+    {
+      "id": "action-add-to-cart",
+      "type": "action",
+      "position": { "x": 1300, "y": 100 },
+      "data": {
+        "label": "Добавить в корзину",
+        "actionType": "api",
+        "config": {
+          "endpoint": "/api/cart/add",
+          "method": "POST",
+          "contextKey": "cartResponse"
+        },
+        "inputBindings": [
+          { "name": "productId", "variable": "context.selectedProduct.id" }
+        ],
+        "outputBindings": [
+          { "name": "cart", "variable": "context.cart" }
+        ]
+      }
+    },
+    {
+      "id": "screen-cart",
+      "type": "screen",
+      "position": { "x": 1600, "y": 100 },
+      "data": {
+        "label": "Корзина",
+        "screenId": "cart",
+        "description": "Просмотр корзины",
+        "inputBindings": [
+          { "name": "cart", "variable": "context.cart" }
+        ],
+        "outputBindings": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-home-load",
+      "source": "screen-home",
+      "target": "action-load-products",
+      "type": "custom",
+      "label": "Главный экран → Загрузка продуктов",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Главный экран → Загрузка продуктов",
+        "trigger": "onLoad",
+        "event": "onLoad",
+        "type": "default",
+        "description": "Автоматическая загрузка продуктов при открытии приложения"
+      }
+    },
+    {
+      "id": "e-load-success",
+      "source": "action-load-products",
+      "target": "screen-product-list",
+      "type": "custom",
+      "label": "Успешная загрузка",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Успешная загрузка",
+        "trigger": "onSuccess",
+        "event": "onSuccess",
+        "type": "success",
+        "description": "Переход к списку при успешной загрузке данных"
+      }
+    },
+    {
+      "id": "e-load-error",
+      "source": "action-load-products",
+      "target": "screen-error",
+      "type": "custom",
+      "label": "Ошибка загрузки",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Ошибка загрузки",
+        "trigger": "onError",
+        "event": "onError",
+        "type": "error",
+        "description": "Показать экран ошибки при неудачной загрузке"
+      }
+    },
+    {
+      "id": "e-select-product",
+      "source": "screen-product-list",
+      "target": "screen-product-detail",
+      "type": "custom",
+      "label": "Выбор продукта",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Выбор продукта",
+        "trigger": "onClick",
+        "event": "onClick",
+        "type": "default",
+        "description": "Переход к деталям при клике на продукт"
+      }
+    },
+    {
+      "id": "e-add-to-cart",
+      "source": "screen-product-detail",
+      "target": "action-add-to-cart",
+      "type": "custom",
+      "label": "Нажатие кнопки Добавить",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Нажатие кнопки Добавить",
+        "trigger": "onClick",
+        "event": "onClick",
+        "type": "default",
+        "description": "Пользователь нажал кнопку 'Добавить в корзину'"
+      }
+    },
+    {
+      "id": "e-cart-success",
+      "source": "action-add-to-cart",
+      "target": "screen-cart",
+      "type": "custom",
+      "label": "Успешное добавление",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Успешное добавление",
+        "trigger": "onSuccess",
+        "event": "onSuccess",
+        "type": "success",
+        "description": "Товар успешно добавлен в корзину"
+      }
+    },
+    {
+      "id": "e-retry",
+      "source": "screen-error",
+      "target": "action-load-products",
+      "type": "custom",
+      "label": "Повторная попытка",
+      "markerEnd": { "type": "ArrowClosed" },
+      "data": {
+        "name": "Повторная попытка",
+        "trigger": "onClick",
+        "event": "onClick",
+        "type": "default",
+        "description": "Пользователь нажал кнопку 'Повторить'"
+      }
+    }
+  ],
+  "variableSchemas": {
+    "productsList": {
+      "type": "list",
+      "schema": {
+        "id": "id",
+        "name": "title",
+        "price": "price",
+        "image": "image"
+      },
+      "source": "api",
+      "endpoint": "/api/products"
+    },
+    "selectedProduct": {
+      "type": "object",
+      "schema": {
+        "id": "string",
+        "name": "string",
+        "price": "number",
+        "description": "string",
+        "image": "string"
+      },
+      "source": "screen"
+    },
+    "cart": {
+      "type": "list",
+      "schema": {
+        "productId": "string",
+        "quantity": "number",
+        "price": "number"
+      },
+      "source": "api"
+    }
+  }
+}

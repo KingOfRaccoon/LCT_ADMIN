@@ -268,14 +268,25 @@
   gap: 24px;
 }
 
+.products-grid.virtualized {
+  display: block;
+}
+
+.products-grid.virtualized > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+}
+
 .product-card {
-  background: #f8fafc;
+  background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .product-card:hover {
@@ -366,7 +377,7 @@
 }
 
 .card-description {
-  color: #64748b;
+  color: #475569;
   margin: 0 0 16px 0;
   line-height: 1.5;
   font-size: 14px;
@@ -379,24 +390,27 @@
 
 .card-stats {
   display: flex;
-  gap: 24px;
+  gap: 12px;
 }
 
 .stat {
   text-align: center;
   flex: 1;
+  background: transparent;
+  padding: 4px;
+  border-radius: 6px;
 }
 
 .stat-value {
   display: block;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: #1e293b !important;
 }
 
 .stat-label {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 11px;
+  color: #64748b !important;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-top: 2px;
@@ -406,6 +420,7 @@
   padding: 16px 20px;
   background: #ffffff;
   display: flex;
+
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid #f1f5f9;
@@ -414,7 +429,8 @@
 
 .last-modified {
   font-size: 13px;
-  color: #64748b;
+  color: #475569;
+  font-weight: 500;
 }
 
 /* Status Badge */
@@ -465,11 +481,27 @@
   font-size: 14px;
 }
 
+.virtualized-tbody {
+  display: block;
+}
+
+.virtualized-tbody table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.virtualized-tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
 .products-table tr:last-child td {
   border-bottom: none;
 }
 
-.products-table tr:hover {
+.products-table tr:hover,
+.virtualized-tbody tr:hover {
   background: #f8fafc;
 }
 
